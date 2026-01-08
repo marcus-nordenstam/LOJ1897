@@ -1,0 +1,125 @@
+<Grid
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Stretch">
+    
+    <!-- Background with MainMenu.png -->
+    <Grid.Background>
+        <ImageBrush ImageSource="MainMenu.png" Stretch="UniformToFill"/>
+    </Grid.Background>
+        
+    <Grid.Resources>
+        <ResourceDictionary>
+            <!-- Style for TextBox with dark background -->
+            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                <Setter Property="TextBox.Background">
+                    <Setter.Value>
+                        <SolidColorBrush Color="#FF2C2416"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="TextBox.Foreground">
+                    <Setter.Value>
+                        <SolidColorBrush Color="#FFD4C4A0"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="TextBox.BorderThickness" Value="2"/>
+                <Setter Property="TextBox.BorderBrush">
+                    <Setter.Value>
+                        <SolidColorBrush Color="#FF6B5A3D"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="TextBox.Padding" Value="10,8,10,8"/>
+                <Setter Property="TextBox.FontSize" Value="20"/>
+                <Setter Property="TextBox.FontFamily" Value="Theme/Fonts/#PT Root UI"/>
+            </Style>
+            
+            <!-- Style for TextBlock labels -->
+            <Style TargetType="TextBlock">
+                <Setter Property="TextBlock.Foreground">
+                    <Setter.Value>
+                        <SolidColorBrush Color="#FFD4C4A0"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="TextBlock.FontSize" Value="24"/>
+                <Setter Property="TextBlock.FontFamily" Value="Theme/Fonts/#PT Root UI"/>
+                <Setter Property="TextBlock.FontWeight" Value="Bold"/>
+                <Setter Property="TextBlock.HorizontalAlignment" Value="Center"/>
+                <Setter Property="TextBlock.VerticalAlignment" Value="Center"/>
+                <Setter Property="TextBlock.Effect">
+                    <Setter.Value>
+                        <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="2" Opacity="0.8"/>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            
+            <!-- Style for Button with vintage look -->
+            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                <Setter Property="Button.Background">
+                    <Setter.Value>
+                        <SolidColorBrush Color="#FF4A3C28"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="Button.Foreground">
+                    <Setter.Value>
+                        <SolidColorBrush Color="#FFD4C4A0"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="Button.BorderThickness" Value="2"/>
+                <Setter Property="Button.BorderBrush">
+                    <Setter.Value>
+                        <SolidColorBrush Color="#FF8B7355"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="Button.FontSize" Value="28"/>
+                <Setter Property="Button.FontFamily" Value="Theme/Fonts/#PT Root UI"/>
+                <Setter Property="Button.FontWeight" Value="Bold"/>
+                <Setter Property="Button.Padding" Value="40,15,40,15"/>
+            </Style>
+        </ResourceDictionary>
+    </Grid.Resources>
+
+    <!-- Main Menu Content -->
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,100,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Title -->
+            <RowDefinition Height="80"/>    <!-- Spacer -->
+            <RowDefinition Height="Auto"/>  <!-- Seed Label -->
+            <RowDefinition Height="20"/>    <!-- Small Spacer -->
+            <RowDefinition Height="Auto"/>  <!-- Seed Input -->
+            <RowDefinition Height="60"/>    <!-- Spacer -->
+            <RowDefinition Height="Auto"/>  <!-- Play Button -->
+        </Grid.RowDefinitions>
+
+        <!-- Game Title -->
+        <TextBlock Grid.Row="0"
+                   Text="LEGENDS OF JUSTICE: 1897"
+                   FontSize="48"
+                   FontWeight="Bold"
+                   HorizontalAlignment="Center"/>
+
+        <!-- Seed Label -->
+        <TextBlock Grid.Row="2"
+                   Text="Seed Value"
+                   FontSize="24"
+                   HorizontalAlignment="Center"/>
+
+        <!-- Seed Input TextBox -->
+        <TextBox Grid.Row="4"
+                 x:Name="SeedTextBox"
+                 Width="400"
+                 Height="50"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"
+                 Text="12345"/>
+
+        <!-- Play Game Button -->
+        <Button Grid.Row="6"
+                x:Name="PlayGameButton"
+                Content="PLAY GAME"
+                HorizontalAlignment="Center"
+                Cursor="Hand"/>
+
+    </Grid>
+
+</Grid>

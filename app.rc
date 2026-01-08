@@ -1,0 +1,6 @@
+#include <windows.h>
+#include "resource.h"
+
+// Application icon resource
+// Note: Windows resource compiler requires ICO format, not PNG directly
+IDI_MAIN_ICON ICON "Logo.ico"
