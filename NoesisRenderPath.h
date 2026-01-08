@@ -66,14 +66,19 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     // Player character tracking
     wi::ecs::Entity playerCharacter = wi::ecs::INVALID_ENTITY;
-    float cameraHorizontal = 0.0f; // Camera yaw angle
-    float cameraVertical = 0.3f;   // Camera pitch angle
-    float cameraDistance = 2.5f;   // Camera distance from player
+    float cameraHorizontal = 0.0f;        // Camera yaw angle
+    float cameraVertical = 0.3f;          // Camera pitch angle
+    float cameraDistance = 2.5f;          // Camera distance from player
+    float cameraHorizontalOffset = 0.25f; // Over-the-shoulder horizontal offset (positive = right)
 
     // NPC tracking and Lua scripts
     std::vector<wi::ecs::Entity> npcEntities;
     bool patrolScriptLoaded = false;
     bool guardScriptLoaded = false;
+
+    // Aim dot (reticle) - raycast from character's eye in camera direction
+    bool aimDotVisible = false;
+    XMFLOAT2 aimDotScreenPos = {0, 0};
 
     // Fullscreen state
     HWND windowHandle = nullptr;
@@ -629,10 +634,10 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
         // Try multiple locations for the patrol script (like walkabout)
         if (!patrolScriptLoaded) {
-            std::vector<std::string> script_paths = {
-                basePath + "Content/scripts/npc/patrol.lua",
-                basePath + "SharedContent/scripts/npc/patrol.lua",
-                basePath + "scripts/npc/patrol.lua"};
+            std::vector<std::string> script_paths = {basePath + "Content/scripts/npc/patrol.lua",
+                                                     basePath +
+                                                         "SharedContent/scripts/npc/patrol.lua",
+                                                     basePath + "scripts/npc/patrol.lua"};
 
             for (const auto &patrol_script_path : script_paths) {
                 if (wi::helper::FileExists(patrol_script_path)) {
@@ -653,10 +658,10 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
         // Try multiple locations for the guard script (like walkabout)
         if (!guardScriptLoaded) {
-            std::vector<std::string> script_paths = {
-                basePath + "Content/scripts/npc/guard.lua",
-                basePath + "SharedContent/scripts/npc/guard.lua",
-                basePath + "scripts/npc/guard.lua"};
+            std::vector<std::string> script_paths = {basePath + "Content/scripts/npc/guard.lua",
+                                                     basePath +
+                                                         "SharedContent/scripts/npc/guard.lua",
+                                                     basePath + "scripts/npc/guard.lua"};
 
             for (const auto &guard_script_path : script_paths) {
                 if (wi::helper::FileExists(guard_script_path)) {
@@ -985,6 +990,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                         rootElement->SetVisibility(Noesis::Visibility_Visible);
                     }
                     CleanupNPCScripts();
+                    aimDotVisible = false;
                     LoadAndPlayMenuMusic();
                     OutputDebugStringA("Returned to menu (Escape pressed)\n");
                 }
@@ -994,16 +1000,22 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 // Camera orbits around player based on mouse input
                 XMFLOAT3 charPos = playerChar->GetPositionInterpolated();
 
+                // Calculate camera's right vector (perpendicular to look direction, horizontal)
+                float camRightX = cosf(cameraHorizontal); // Right is 90 degrees from forward
+                float camRightZ = -sinf(cameraHorizontal);
+
                 // Calculate camera position orbiting around character
                 float camOffsetX = sinf(cameraHorizontal) * cosf(cameraVertical) * cameraDistance;
                 float camOffsetY = sinf(cameraVertical) * cameraDistance;
                 float camOffsetZ = cosf(cameraHorizontal) * cosf(cameraVertical) * cameraDistance;
 
+                // Eye target (what camera looks at) - offset horizontally for over-the-shoulder
                 XMFLOAT3 eyeTarget;
-                eyeTarget.x = charPos.x;
+                eyeTarget.x = charPos.x + camRightX * cameraHorizontalOffset;
                 eyeTarget.y = charPos.y + 1.6f; // Eye level
-                eyeTarget.z = charPos.z;
+                eyeTarget.z = charPos.z + camRightZ * cameraHorizontalOffset;
 
+                // Camera position - also offset horizontally
                 XMFLOAT3 camPos;
                 camPos.x = eyeTarget.x - camOffsetX;
                 camPos.y = eyeTarget.y + camOffsetY;
@@ -1036,6 +1048,69 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
                 camera->TransformCamera(cameraTransform);
                 camera->UpdateCamera();
+
+                // === HEAD LOOK & AIM DOT ===
+                aimDotVisible = false;
+
+                // Get humanoid component for eye position
+                auto *humanoid = scene.cc_humanoids.GetComponent(playerChar->humanoidEntity);
+                if (humanoid != nullptr) {
+                    wi::ecs::Entity rightEyeBone =
+                        humanoid->bones[wi::scene::CCHumanoidComponent::kRightEyeBoneIndex];
+
+                    if (rightEyeBone != wi::ecs::INVALID_ENTITY) {
+                        wi::scene::TransformComponent *eyeTransform =
+                            scene.transforms.GetComponent(rightEyeBone);
+
+                        if (eyeTransform != nullptr) {
+                            XMFLOAT3 eyePos = eyeTransform->GetPosition();
+
+                            // Use body facing direction for aim ray
+                            XMFLOAT3 bodyDir = playerChar->GetFacing();
+
+                            // Ray origin slightly out from eye in body direction
+                            XMFLOAT3 rayOrigin;
+                            rayOrigin.x = eyePos.x + bodyDir.x * 0.4f;
+                            rayOrigin.y = eyePos.y + bodyDir.y * 0.4f;
+                            rayOrigin.z = eyePos.z + bodyDir.z * 0.4f;
+
+                            // Raycast in body facing direction
+                            wi::primitive::Ray aimRay(rayOrigin, bodyDir, 0.0f, 99.0f);
+                            auto aimHit = scene.Intersects(
+                                aimRay, wi::enums::FILTER_OPAQUE | wi::enums::FILTER_TRANSPARENT,
+                                ~0u);
+
+                            // Calculate target point (hit or 100 units from eye)
+                            XMFLOAT3 targetPoint;
+                            float aimDistance;
+                            if (aimHit.entity != wi::ecs::INVALID_ENTITY) {
+                                aimDistance = aimHit.distance;
+                                targetPoint.x = rayOrigin.x + bodyDir.x * aimDistance;
+                                targetPoint.y = rayOrigin.y + bodyDir.y * aimDistance;
+                                targetPoint.z = rayOrigin.z + bodyDir.z * aimDistance;
+                            } else {
+                                aimDistance = 99.0f;
+                                targetPoint.x = rayOrigin.x + bodyDir.x * 99.0f;
+                                targetPoint.y = rayOrigin.y + bodyDir.y * 99.0f;
+                                targetPoint.z = rayOrigin.z + bodyDir.z * 99.0f;
+                            }
+
+                            // Draw debug line (transparent green)
+                            /*
+                            wi::renderer::RenderableLine debugLine;
+                            debugLine.start = rayOrigin;
+                            debugLine.end = targetPoint;
+                            debugLine.color_start = XMFLOAT4(0, 1, 0, 0.3f); // Green, transparent
+                            debugLine.color_end = XMFLOAT4(0, 1, 0, 0.3f);
+                            wi::renderer::DrawLine(debugLine);
+                            */
+                            // Aim dot fixed at screen center
+                            aimDotScreenPos.x = GetLogicalWidth() * 0.5f;
+                            aimDotScreenPos.y = GetLogicalHeight() * 0.5f;
+                            aimDotVisible = true;
+                        }
+                    }
+                }
             }
 
             // Update NPC behavior via Lua scripts (like walkabout)
@@ -1051,8 +1126,8 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     }
                     // Call the appropriate Lua update function for each NPC
                     // e.g., npc_patrol_update(entity, dt) or npc_guard_update(entity, dt)
-                    std::string lua_call =
-                        mind->scriptCallback + "(" + std::to_string(npc) + ", " + std::to_string(dt) + ")";
+                    std::string lua_call = mind->scriptCallback + "(" + std::to_string(npc) + ", " +
+                                           std::to_string(dt) + ")";
                     wi::lua::RunText(lua_call);
                 }
             }
@@ -1102,6 +1177,43 @@ class NoesisRenderPath : public wi::RenderPath3D {
     void Compose(wi::graphics::CommandList cmd) const override {
         // Call parent Compose first (Wicked Engine composes its layers to backbuffer)
         RenderPath3D::Compose(cmd);
+
+        // Draw aim dot at raycast hit position
+        if (!menuVisible && aimDotVisible) {
+            wi::image::SetCanvas(*this);
+
+            // Outer circle: 4px radius, semi-transparent
+            {
+                wi::image::Params params;
+                params.pos = XMFLOAT3(aimDotScreenPos.x - 4.0f, aimDotScreenPos.y - 4.0f, 0);
+                params.siz = XMFLOAT2(8.0f, 8.0f);
+                params.pivot = XMFLOAT2(0, 0);
+                params.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.3f); // White, 30% opacity
+                params.blendFlag = wi::enums::BLENDMODE_ALPHA;
+                params.enableCornerRounding();
+                params.corners_rounding[0] = {4.0f, 8}; // Top-left
+                params.corners_rounding[1] = {4.0f, 8}; // Top-right
+                params.corners_rounding[2] = {4.0f, 8}; // Bottom-left
+                params.corners_rounding[3] = {4.0f, 8}; // Bottom-right
+                wi::image::Draw(nullptr, params, cmd);
+            }
+
+            // Inner dot: 2px radius, fully opaque
+            {
+                wi::image::Params params;
+                params.pos = XMFLOAT3(aimDotScreenPos.x - 2.0f, aimDotScreenPos.y - 2.0f, 0);
+                params.siz = XMFLOAT2(4.0f, 4.0f);
+                params.pivot = XMFLOAT2(0, 0);
+                params.color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f); // White, fully opaque
+                params.blendFlag = wi::enums::BLENDMODE_ALPHA;
+                params.enableCornerRounding();
+                params.corners_rounding[0] = {2.0f, 8}; // Top-left
+                params.corners_rounding[1] = {2.0f, 8}; // Top-right
+                params.corners_rounding[2] = {2.0f, 8}; // Bottom-left
+                params.corners_rounding[3] = {2.0f, 8}; // Bottom-right
+                wi::image::Draw(nullptr, params, cmd);
+            }
+        }
 
         // Now render Noesis UI on top of everything (only if menu is visible)
         if (menuVisible && uiView && noesisDevice) {
@@ -1227,11 +1339,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     }
 
                     // Stop menu music
-                    // if (menuMusicInstance.IsValid()) {
-                    //    wi::audio::Stop(&menuMusicInstance);
-                    //    menuMusicInstance = {};
-                    //    menuMusic = {};
-                    //}
+                    if (menuMusicInstance.IsValid()) {
+                        wi::audio::Stop(&menuMusicInstance);
+                        menuMusicInstance = {};
+                        menuMusic = {};
+                    }
 
                     // Load the scene
                     LoadGameScene();
