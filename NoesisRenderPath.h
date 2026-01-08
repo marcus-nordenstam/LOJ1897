@@ -90,6 +90,9 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Get Noesis view for input handling
     Noesis::IView *GetNoesisView() const { return uiView; }
 
+    // Check if menu is visible (for input routing)
+    bool IsMenuVisible() const { return menuVisible; }
+
     // Config file management
     std::string GetConfigFilePath() {
         wchar_t exePath[MAX_PATH];
@@ -665,9 +668,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     cameraVertical = 0.3f;
                     cameraDistance = 2.5f;
 
-                    // Set camera distance on character
-                    playerChar->SetCameraDistance(cameraDistance);
-
                     OutputDebugStringA("Camera initialized to follow player\n");
                 }
             } else {
@@ -829,7 +829,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                             // Apply mouse look to camera angles
                             cameraHorizontal += deltaX;
                             cameraVertical =
-                                std::clamp(cameraVertical - deltaY, -XM_PIDIV4, XM_PIDIV4 * 1.2f);
+                                std::clamp(cameraVertical + deltaY, -XM_PIDIV4, XM_PIDIV4 * 1.2f);
                         }
                     } else {
                         mouseInitialized = true;
@@ -841,34 +841,42 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     SetCursorPos(screenCenter.x, screenCenter.y);
                 }
 
-                // Update character camera distance for third-person view
-                playerChar->SetCameraDistance(cameraDistance);
+                // Camera zoom with mouse wheel
+                XMFLOAT4 pointer = wi::input::GetPointer();
+                cameraDistance = std::max(0.5f, cameraDistance - pointer.z * 0.3f);
 
-                // === ACTION SYSTEM: HEAD MOTOR - LOOK action ===
-                // Turn head based on mouse input (controls camera orientation)
-                XMFLOAT3 look_dir;
-                look_dir.x = sinf(cameraHorizontal);
-                look_dir.y = 0.0f;
-                look_dir.z = cosf(cameraHorizontal);
-                auto turn_head_action =
-                    wi::scene::character_system::make_turn_head(scene, look_dir, cameraVertical);
-                playerChar->SetAction(scene, turn_head_action);
+                // === ACTION SYSTEM: BODY MOTOR - WALK ===
+                bool wPressed = (GetAsyncKeyState('W') & 0x8000) != 0;
+                bool sPressed = (GetAsyncKeyState('S') & 0x8000) != 0;
 
-                // === ACTION SYSTEM: BODY MOTOR - WALK action ===
-                // W key triggers walk action
-                if ((GetAsyncKeyState('W') & 0x8000) != 0) {
+                if (wPressed || sPressed) {
                     if (playerChar->IsGrounded() || playerChar->IsWallIntersect()) {
-                        auto action = wi::scene::character_system::make_walk(scene, *playerChar);
+                        // Calculate walk direction based on camera and input
+                        XMFLOAT3 walk_dir;
+                        if (sPressed && !wPressed) {
+                            // S key: walk toward camera (backward)
+                            walk_dir.x = -sinf(cameraHorizontal);
+                            walk_dir.y = 0.0f;
+                            walk_dir.z = -cosf(cameraHorizontal);
+                        } else {
+                            // W key: walk away from camera (forward)
+                            walk_dir.x = sinf(cameraHorizontal);
+                            walk_dir.y = 0.0f;
+                            walk_dir.z = cosf(cameraHorizontal);
+                        }
+
+                        // Walk action with direction (handles body turning internally)
+                        auto action =
+                            wi::scene::character_system::make_walk(scene, *playerChar, walk_dir);
                         playerChar->SetAction(scene, action);
                     }
                 } else if (playerChar->IsWalking()) {
-                    // Return to idle when W released
+                    // Return to idle when no movement key pressed
                     auto action = wi::scene::character_system::make_idle(scene, *playerChar);
                     playerChar->SetAction(scene, action);
                 }
 
-                // === ACTION SYSTEM: BODY MOTOR - JUMP action ===
-                // Space key triggers jump
+                // === ACTION SYSTEM: BODY MOTOR - JUMP ===
                 static bool spaceWasPressed = false;
                 bool spacePressed = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
                 if (spacePressed && !spaceWasPressed && playerChar->IsGrounded()) {
@@ -881,40 +889,44 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 static bool escWasPressed = false;
                 bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
                 if (escPressed && !escWasPressed) {
-                    // Disable walkabout mode
                     SetFirstPersonMode(false);
-
-                    // Show menu
                     menuVisible = true;
                     if (rootElement) {
                         rootElement->SetVisibility(Noesis::Visibility_Visible);
                     }
-
-                    // Restart menu music
                     LoadAndPlayMenuMusic();
-
                     OutputDebugStringA("Returned to menu (Escape pressed)\n");
                 }
                 escWasPressed = escPressed;
 
-                // === CAMERA: Get position from character (computed from LOOK action state) ===
+                // === CAMERA (direct control, no actions) ===
+                // Camera orbits around player based on mouse input
+                XMFLOAT3 charPos = playerChar->GetPositionInterpolated();
+
+                // Calculate camera position orbiting around character
+                float camOffsetX = sinf(cameraHorizontal) * cosf(cameraVertical) * cameraDistance;
+                float camOffsetY = sinf(cameraVertical) * cameraDistance;
+                float camOffsetZ = cosf(cameraHorizontal) * cosf(cameraVertical) * cameraDistance;
+
+                XMFLOAT3 eyeTarget;
+                eyeTarget.x = charPos.x;
+                eyeTarget.y = charPos.y + 1.6f; // Eye level
+                eyeTarget.z = charPos.z;
+
                 XMFLOAT3 camPos;
-                float camYaw, camPitch;
-                playerChar->GetThirdPersonCamera(camPos, camYaw, camPitch);
+                camPos.x = eyeTarget.x - camOffsetX;
+                camPos.y = eyeTarget.y + camOffsetY;
+                camPos.z = eyeTarget.z - camOffsetZ;
 
                 // Camera collision check (prevent camera from going through walls)
-                XMFLOAT3 charPos = playerChar->GetPositionInterpolated();
-                XMVECTOR targetPos = XMLoadFloat3(&charPos);
-                targetPos = XMVectorSetY(targetPos, XMVectorGetY(targetPos) + 1.6f); // Eye level
-                XMFLOAT3 targetPosF3;
-                XMStoreFloat3(&targetPosF3, targetPos);
+                XMVECTOR targetPos = XMLoadFloat3(&eyeTarget);
+                XMVECTOR cameraPos = XMLoadFloat3(&camPos);
 
                 XMFLOAT3 rayDir;
-                XMVECTOR cameraPos = XMLoadFloat3(&camPos);
                 XMStoreFloat3(&rayDir, XMVector3Normalize(cameraPos - targetPos));
                 float rayDist = XMVectorGetX(XMVector3Length(cameraPos - targetPos));
 
-                wi::primitive::Ray cameraRay(targetPosF3, rayDir, 0.1f, rayDist);
+                wi::primitive::Ray cameraRay(eyeTarget, rayDir, 0.1f, rayDist);
                 auto collision = scene.Intersects(
                     cameraRay, wi::enums::FILTER_NAVIGATION_MESH | wi::enums::FILTER_COLLIDER, ~1u);
 
@@ -924,14 +936,13 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     XMStoreFloat3(&camPos, cameraPos);
                 }
 
-                // Apply camera transform from LOOK action state
+                // Apply camera transform directly (no action system)
                 wi::scene::TransformComponent cameraTransform;
                 cameraTransform.ClearTransform();
                 cameraTransform.Translate(camPos);
-                cameraTransform.RotateRollPitchYaw(XMFLOAT3(camPitch, camYaw, 0));
+                cameraTransform.RotateRollPitchYaw(XMFLOAT3(cameraVertical, cameraHorizontal, 0));
                 cameraTransform.UpdateTransform();
 
-                // Apply to camera
                 camera->TransformCamera(cameraTransform);
                 camera->UpdateCamera();
             }
@@ -1106,11 +1117,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     }
 
                     // Stop menu music
-                    if (menuMusicInstance.IsValid()) {
-                        wi::audio::Stop(&menuMusicInstance);
-                        menuMusicInstance = {};
-                        menuMusic = {};
-                    }
+                    // if (menuMusicInstance.IsValid()) {
+                    //    wi::audio::Stop(&menuMusicInstance);
+                    //    menuMusicInstance = {};
+                    //    menuMusic = {};
+                    //}
 
                     // Load the scene
                     LoadGameScene();

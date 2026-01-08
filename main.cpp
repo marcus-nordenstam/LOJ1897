@@ -245,7 +245,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
             break;
         case WM_LBUTTONDOWN:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView()) {
+            // Only forward mouse to Noesis when menu is visible
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 g_noesisRenderPath->GetNoesisView()->MouseButtonDown(x, y,
@@ -253,14 +254,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
             break;
         case WM_LBUTTONUP:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView()) {
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 g_noesisRenderPath->GetNoesisView()->MouseButtonUp(x, y, Noesis::MouseButton_Left);
             }
             break;
         case WM_RBUTTONDOWN:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView()) {
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 g_noesisRenderPath->GetNoesisView()->MouseButtonDown(x, y,
@@ -268,7 +269,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
             break;
         case WM_RBUTTONUP:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView()) {
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 g_noesisRenderPath->GetNoesisView()->MouseButtonUp(x, y, Noesis::MouseButton_Right);
@@ -276,7 +277,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             break;
         case WM_MOUSEMOVE:
             trackMouse(hWnd);
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView()) {
+            // Only forward mouse to Noesis when menu is visible
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 g_noesisRenderPath->GetNoesisView()->MouseMove(x, y);
@@ -296,7 +298,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
         } break;
         case WM_KEYDOWN:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView()) {
+            // Only forward keyboard to Noesis when menu is visible
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
                 Noesis::Key key = ConvertWin32KeyToNoesis((int)wParam);
                 if (key != Noesis::Key_None) {
                     g_noesisRenderPath->GetNoesisView()->KeyDown(key);
@@ -304,7 +307,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
             break;
         case WM_KEYUP:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView()) {
+            // Only forward keyboard to Noesis when menu is visible
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
                 Noesis::Key key = ConvertWin32KeyToNoesis((int)wParam);
                 if (key != Noesis::Key_None) {
                     g_noesisRenderPath->GetNoesisView()->KeyUp(key);
