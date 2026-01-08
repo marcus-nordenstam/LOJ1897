@@ -70,6 +70,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
     float cameraVertical = 0.3f;   // Camera pitch angle
     float cameraDistance = 2.5f;   // Camera distance from player
 
+    // NPC tracking and Lua scripts
+    std::vector<wi::ecs::Entity> npcEntities;
+    bool patrolScriptLoaded = false;
+    bool guardScriptLoaded = false;
+
     // Fullscreen state
     HWND windowHandle = nullptr;
     bool isFullscreen = false;
@@ -532,6 +537,17 @@ class NoesisRenderPath : public wi::RenderPath3D {
             // NPC-specific setup
             mind.type = wi::scene::MindComponent::Type::NPC;
             layer->layerMask = 1 << 1; // NPC layer
+
+            // Assign script callback (50% patrol, 50% guard like walkabout)
+            bool is_patrol = (rand() % 2) == 0;
+            if (is_patrol) {
+                mind.scriptCallback = "npc_patrol_update";
+            } else {
+                mind.scriptCallback = "npc_guard_update";
+            }
+
+            // Track NPC entity for Lua updates
+            npcEntities.push_back(characterEntity);
         }
 
         // === RETARGET ANIMATIONS (like walkabout) ===
@@ -604,6 +620,75 @@ class NoesisRenderPath : public wi::RenderPath3D {
         return characterEntity;
     }
 
+    void LoadNPCScripts() {
+        // Ensure project path ends with separator
+        std::string basePath = projectPath;
+        if (!basePath.empty() && basePath.back() != '/' && basePath.back() != '\\') {
+            basePath += "/";
+        }
+
+        // Try multiple locations for the patrol script (like walkabout)
+        if (!patrolScriptLoaded) {
+            std::vector<std::string> script_paths = {
+                basePath + "Content/scripts/npc/patrol.lua",
+                basePath + "SharedContent/scripts/npc/patrol.lua",
+                basePath + "scripts/npc/patrol.lua"};
+
+            for (const auto &patrol_script_path : script_paths) {
+                if (wi::helper::FileExists(patrol_script_path)) {
+                    wi::lua::RunFile(patrol_script_path);
+                    patrolScriptLoaded = true;
+                    char buffer[512];
+                    sprintf_s(buffer, "Loaded NPC patrol script from: %s\n",
+                              patrol_script_path.c_str());
+                    OutputDebugStringA(buffer);
+                    break;
+                }
+            }
+
+            if (!patrolScriptLoaded) {
+                OutputDebugStringA("WARNING: NPC patrol script not found in any location\n");
+            }
+        }
+
+        // Try multiple locations for the guard script (like walkabout)
+        if (!guardScriptLoaded) {
+            std::vector<std::string> script_paths = {
+                basePath + "Content/scripts/npc/guard.lua",
+                basePath + "SharedContent/scripts/npc/guard.lua",
+                basePath + "scripts/npc/guard.lua"};
+
+            for (const auto &guard_script_path : script_paths) {
+                if (wi::helper::FileExists(guard_script_path)) {
+                    wi::lua::RunFile(guard_script_path);
+                    guardScriptLoaded = true;
+                    char buffer[512];
+                    sprintf_s(buffer, "Loaded NPC guard script from: %s\n",
+                              guard_script_path.c_str());
+                    OutputDebugStringA(buffer);
+                    break;
+                }
+            }
+
+            if (!guardScriptLoaded) {
+                OutputDebugStringA("WARNING: NPC guard script not found in any location\n");
+            }
+        }
+    }
+
+    void CleanupNPCScripts() {
+        // Clean up Lua NPC script state (like walkabout)
+        if (patrolScriptLoaded) {
+            wi::lua::RunText("npc_patrol_clear_all()");
+            patrolScriptLoaded = false;
+        }
+        if (guardScriptLoaded) {
+            wi::lua::RunText("npc_guard_clear_all()");
+            guardScriptLoaded = false;
+        }
+        npcEntities.clear();
+    }
+
     void LoadGameScene() {
         if (levelPath.empty()) {
             OutputDebugStringA("ERROR: No level path configured in config.ini\n");
@@ -657,6 +742,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
             // Spawn player and NPCs based on metadata components
             SpawnCharactersFromMetadata(scene);
+
+            // Load NPC Lua scripts if NPCs were spawned (like walkabout)
+            if (!npcEntities.empty()) {
+                LoadNPCScripts();
+            }
 
             // Initialize camera angles if player was spawned
             if (playerCharacter != wi::ecs::INVALID_ENTITY) {
@@ -894,6 +984,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     if (rootElement) {
                         rootElement->SetVisibility(Noesis::Visibility_Visible);
                     }
+                    CleanupNPCScripts();
                     LoadAndPlayMenuMusic();
                     OutputDebugStringA("Returned to menu (Escape pressed)\n");
                 }
@@ -945,6 +1036,25 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
                 camera->TransformCamera(cameraTransform);
                 camera->UpdateCamera();
+            }
+
+            // Update NPC behavior via Lua scripts (like walkabout)
+            if ((patrolScriptLoaded || guardScriptLoaded) && !npcEntities.empty()) {
+                for (auto npc : npcEntities) {
+                    if (npc == wi::ecs::INVALID_ENTITY) {
+                        continue;
+                    }
+                    // Get the MindComponent to determine which script callback to use
+                    const wi::scene::MindComponent *mind = scene.minds.GetComponent(npc);
+                    if (mind == nullptr || mind->scriptCallback.empty()) {
+                        continue;
+                    }
+                    // Call the appropriate Lua update function for each NPC
+                    // e.g., npc_patrol_update(entity, dt) or npc_guard_update(entity, dt)
+                    std::string lua_call =
+                        mind->scriptCallback + "(" + std::to_string(npc) + ", " + std::to_string(dt) + ")";
+                    wi::lua::RunText(lua_call);
+                }
             }
         }
     }
