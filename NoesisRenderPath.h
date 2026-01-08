@@ -4,6 +4,7 @@
 
 #include "WickedEngine.h"
 #include <wiGraphicsDevice_DX12.h>
+#include <wiAudio.h>
 
 #include <NsRender/D3D12Factory.h>
 #include <NsRender/RenderDevice.h>
@@ -44,6 +45,10 @@ private:
     
     // Saved settings
     std::string projectPath;
+    
+    // Music playback
+    wi::audio::Sound menuMusic;
+    wi::audio::SoundInstance menuMusicInstance;
     
     // Fullscreen state
     HWND windowHandle = nullptr;
@@ -125,9 +130,13 @@ public:
     void UpdateControlStates() {
         // Check if project path is empty
         bool hasProjectPath = false;
+        std::string currentProjectPath;
         if (projectPathTextBox) {
             const char* text = projectPathTextBox->GetText();
             hasProjectPath = (text != nullptr && strlen(text) > 0);
+            if (hasProjectPath) {
+                currentProjectPath = text;
+            }
         }
         
         // Enable/disable controls based on project path
@@ -139,6 +148,67 @@ public:
         }
         if (fullscreenButton) {
             fullscreenButton->SetIsEnabled(hasProjectPath);
+        }
+        
+        // Load and play music if project path is set and music isn't already playing
+        if (hasProjectPath && !menuMusicInstance.IsValid()) {
+            LoadAndPlayMenuMusic(currentProjectPath);
+        }
+        // Stop music if project path is cleared
+        else if (!hasProjectPath && menuMusicInstance.IsValid()) {
+            wi::audio::Stop(&menuMusicInstance);
+            menuMusicInstance = {};
+            menuMusic = {};
+        }
+    }
+    
+    void LoadAndPlayMenuMusic(const std::string& projPath) {
+        // Construct music file path
+        // WickedEngine supports WAV, OGG Vorbis, and MP3 formats
+        std::string musicPath = projPath;
+        if (!musicPath.empty() && musicPath.back() != '/' && musicPath.back() != '\\') {
+            musicPath += "/";
+        }
+        musicPath += "SharedContent/Music/Dataspel Tema 4_4 Em 144-v2.mp3";
+        
+        // Check if file exists
+        if (!wi::helper::FileExists(musicPath)) {
+            // Try alternate formats
+            std::string oggPath = wi::helper::ReplaceExtension(musicPath, "ogg");
+            std::string wavPath = wi::helper::ReplaceExtension(musicPath, "wav");
+            
+            if (wi::helper::FileExists(oggPath)) {
+                musicPath = oggPath;
+            } else if (wi::helper::FileExists(wavPath)) {
+                musicPath = wavPath;
+            } else {
+                char buffer[512];
+                sprintf_s(buffer, "Music file not found: %s (tried .mp3, .ogg, .wav)\n", musicPath.c_str());
+                OutputDebugStringA(buffer);
+                return;
+            }
+        }
+        
+        // Create sound from file
+        if (wi::audio::CreateSound(musicPath, &menuMusic)) {
+            // Configure music instance
+            menuMusicInstance.type = wi::audio::SUBMIX_TYPE_MUSIC;
+            menuMusicInstance.SetLooped(true);
+            
+            // Create sound instance and play
+            if (wi::audio::CreateSoundInstance(&menuMusic, &menuMusicInstance)) {
+                wi::audio::Play(&menuMusicInstance);
+                
+                char buffer[512];
+                sprintf_s(buffer, "Started playing menu music: %s\n", musicPath.c_str());
+                OutputDebugStringA(buffer);
+            } else {
+                OutputDebugStringA("Failed to create music instance\n");
+            }
+        } else {
+            char buffer[512];
+            sprintf_s(buffer, "Failed to load music: %s\n", musicPath.c_str());
+            OutputDebugStringA(buffer);
         }
     }
     
@@ -197,6 +267,10 @@ public:
         // Call parent Start first
         RenderPath3D::Start();
         setOutlineEnabled(true);
+        
+        // Initialize audio system
+        wi::audio::Initialize();
+        
         InitializeNoesis();
         LoadConfig();
     }
@@ -440,6 +514,11 @@ private:
 
 
     void ShutdownNoesis() {
+        // Stop music
+        if (menuMusicInstance.IsValid()) {
+            wi::audio::Stop(&menuMusicInstance);
+        }
+        
         if (uiView) {
             uiView->GetRenderer()->Shutdown();
         }
