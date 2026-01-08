@@ -196,7 +196,17 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${WICKED_SHADERS_DIR} ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Logo.png ${CMAKE_CURRENT_BINARY_DIR}/Logo.png
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/MainMenu.png ${CMAKE_CURRENT_BINARY_DIR}/GUI/MainMenu.png
+    COMMENT "Copying required runtime files to build directory"
 )
+
+# Copy config.ini if it exists
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/config.ini)
+    add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini
+        COMMENT "Copying config.ini to build directory"
+    )
+endif()
 
 # Copy lightsetup.wiscene if it exists
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lightsetup.wiscene)

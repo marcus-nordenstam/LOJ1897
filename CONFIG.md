@@ -4,6 +4,8 @@
 
 The config.ini file should be placed in the same directory as the LOJ1897.exe executable.
 
+**Note:** The config.ini file in the project root is automatically copied to the build directory (Debug/Release/etc.) after every build, so you can edit it in the project root and it will be available in your build output.
+
 ### Format
 
 The configuration file uses a simple INI format with key-value pairs:
@@ -24,9 +26,9 @@ npc_model = SharedContent\Characters\CC_Characters\WI_Char_Male_Med_Baddie_01_tr
 
 **level**: The path to the Wicked Engine scene file (.wiscene) to load when Play Game is pressed, relative to project_path. Required for gameplay.
 
-**player_model**: The path to the player character model (.wiscene), relative to project_path. Optional (for future use).
+**player_model**: The path to the player character model (.wiscene), relative to project_path. This model will be instantiated at entities with MetadataComponent preset set to "Player". Optional.
 
-**npc_model**: The path to the NPC character model (.wiscene), relative to project_path. Optional (for future use).
+**npc_model**: The path to the NPC character model (.wiscene), relative to project_path. This model will be instantiated at entities with MetadataComponent preset set to "NPC". Optional.
 
 ### Example
 
@@ -47,4 +49,8 @@ level = SharedContent\Environment\FieldOfGrass.wiscene
   - The main menu will be hidden
   - The menu music will stop playing
   - The level scene will be loaded
-  - The camera will be positioned at the center of the scene
+  - Player characters will be spawned at entities with MetadataComponent preset "Player"
+  - NPC characters will be spawned at entities with MetadataComponent preset "NPC"
+  - Characters will have collision detection and physics enabled
+  - The camera will automatically follow the player character in third-person view
+  - Camera collision detection prevents the camera from going through walls
