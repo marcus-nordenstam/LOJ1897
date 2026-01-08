@@ -327,6 +327,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                 application.is_window_active = true;
                 break;
             case WM_DESTROY:
+                // Save config before exiting
+                if (g_noesisRenderPath) {
+                    g_noesisRenderPath->SaveConfig();
+                }
                 PostQuitMessage(0);
                 break;
             default:
@@ -380,8 +384,29 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     wcex.lpszClassName = L"LOJ1897";
     wcex.hIconSm = hIconSm;
     RegisterClassExW(&wcex);
-    HWND hWnd = CreateWindowW(wcex.lpszClassName, L"Legends of Justice: 1897", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, 0,
-                              CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+    
+    // 2048x1152 resolution (16:9 aspect ratio)
+    const int windowWidth = 2048;
+    const int windowHeight = 1152;
+    
+    // Non-resizable window style (no maximize/resize box)
+    DWORD windowStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+    
+    // Calculate window rect to account for borders/title bar
+    RECT windowRect = {0, 0, windowWidth, windowHeight};
+    AdjustWindowRect(&windowRect, windowStyle, FALSE);
+    
+    // Center the window on screen
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    int windowX = (screenWidth - (windowRect.right - windowRect.left)) / 2;
+    int windowY = (screenHeight - (windowRect.bottom - windowRect.top)) / 2;
+    
+    HWND hWnd = CreateWindowW(wcex.lpszClassName, L"Legends of Justice: 1897", windowStyle, 
+                              windowX, windowY,
+                              windowRect.right - windowRect.left, 
+                              windowRect.bottom - windowRect.top,
+                              nullptr, nullptr, hInstance, nullptr);
     ShowWindow(hWnd, SW_SHOWDEFAULT);
 
     // Set icon for the window as well
@@ -415,6 +440,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     NoesisRenderPath noesisRenderPath;
     g_noesisRenderPath = &noesisRenderPath;
     noesisRenderPath.setFXAAEnabled(true);
+    noesisRenderPath.SetWindowHandle(hWnd);
 
     application.ActivatePath(&noesisRenderPath);
 

@@ -79,16 +79,18 @@
         </ResourceDictionary>
     </Grid.Resources>
 
-    <!-- Main Menu Content -->
-    <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,100,0,0">
+    <!-- Main Menu Content - Positioned on the right side -->
+    <Grid HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,150,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>  <!-- Title -->
-            <RowDefinition Height="80"/>    <!-- Spacer -->
-            <RowDefinition Height="Auto"/>  <!-- Seed Label -->
-            <RowDefinition Height="20"/>    <!-- Small Spacer -->
-            <RowDefinition Height="Auto"/>  <!-- Seed Input -->
+            <RowDefinition Height="60"/>    <!-- Spacer -->
+            <RowDefinition Height="Auto"/>  <!-- Project Path Label + Input -->
+            <RowDefinition Height="30"/>    <!-- Spacer -->
+            <RowDefinition Height="Auto"/>  <!-- Seed Label + Input (horizontal) -->
             <RowDefinition Height="60"/>    <!-- Spacer -->
             <RowDefinition Height="Auto"/>  <!-- Play Button -->
+            <RowDefinition Height="20"/>    <!-- Small Spacer -->
+            <RowDefinition Height="Auto"/>  <!-- Fullscreen Button -->
         </Grid.RowDefinitions>
 
         <!-- Game Title -->
@@ -98,20 +100,33 @@
                    FontWeight="Bold"
                    HorizontalAlignment="Center"/>
 
-        <!-- Seed Label -->
-        <TextBlock Grid.Row="2"
-                   Text="Seed Value"
-                   FontSize="24"
-                   HorizontalAlignment="Center"/>
+        <!-- Project Path Label + Input (Horizontal) -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
+            <TextBlock Text="Project Path:"
+                       FontSize="24"
+                       VerticalAlignment="Center"
+                       Margin="0,0,15,0"/>
+            <TextBox x:Name="ProjectPathTextBox"
+                     Width="400"
+                     Height="50"
+                     VerticalAlignment="Center"
+                     TextAlignment="Left"
+                     Text=""/>
+        </StackPanel>
 
-        <!-- Seed Input TextBox -->
-        <TextBox Grid.Row="4"
-                 x:Name="SeedTextBox"
-                 Width="400"
-                 Height="50"
-                 HorizontalAlignment="Center"
-                 TextAlignment="Center"
-                 Text="12345"/>
+        <!-- Seed Label + Input (Horizontal) -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center">
+            <TextBlock Text="History Seed:"
+                       FontSize="24"
+                       VerticalAlignment="Center"
+                       Margin="0,0,15,0"/>
+            <TextBox x:Name="SeedTextBox"
+                     Width="250"
+                     Height="50"
+                     VerticalAlignment="Center"
+                     TextAlignment="Center"
+                     Text="12345"/>
+        </StackPanel>
 
         <!-- Play Game Button -->
         <Button Grid.Row="6"
@@ -119,6 +134,15 @@
                 Content="PLAY GAME"
                 HorizontalAlignment="Center"
                 Cursor="Hand"/>
+
+        <!-- Fullscreen Toggle Button -->
+        <Button Grid.Row="8"
+                x:Name="FullscreenButton"
+                Content="FULLSCREEN"
+                HorizontalAlignment="Center"
+                Cursor="Hand"
+                FontSize="20"
+                Padding="30,10,30,10"/>
 
     </Grid>
 

@@ -26,27 +26,179 @@
 
 #include <chrono>
 #include <string>
+#include <fstream>
+#include <vector>
 
 // Noesis integration for Wicked Engine
 class NoesisRenderPath : public wi::RenderPath3D {
 private:
     Noesis::Ptr<Noesis::RenderDevice> noesisDevice;
     Noesis::Ptr<Noesis::IView> uiView;
+    Noesis::Ptr<Noesis::TextBox> projectPathTextBox; // Project path input
     Noesis::Ptr<Noesis::TextBox> seedTextBox; // Seed input
     Noesis::Ptr<Noesis::Button> playGameButton; // Play game button
+    Noesis::Ptr<Noesis::Button> fullscreenButton; // Fullscreen toggle button
     Noesis::Ptr<Noesis::FrameworkElement> rootElement; // Root element from XAML
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
+    
+    // Saved settings
+    std::string projectPath;
+    
+    // Fullscreen state
+    HWND windowHandle = nullptr;
+    bool isFullscreen = false;
+    RECT windowedRect = {};
+    DWORD windowedStyle = 0;
+    DWORD windowedExStyle = 0;
 
 public:
+    // Set window handle for fullscreen management
+    void SetWindowHandle(HWND hwnd) { windowHandle = hwnd; }
+    
     // Get Noesis view for input handling
     Noesis::IView *GetNoesisView() const { return uiView; }
+    
+    // Config file management
+    std::string GetConfigFilePath() {
+        wchar_t exePath[MAX_PATH];
+        GetModuleFileNameW(NULL, exePath, MAX_PATH);
+
+        // Extract directory
+        std::wstring path = exePath;
+        size_t lastSlash = path.find_last_of(L"\\/");
+        if (lastSlash != std::wstring::npos) {
+            path = path.substr(0, lastSlash + 1);
+        }
+        path += L"loj1897.config";
+
+        // Convert wide string to UTF-8
+        int size_needed = WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, NULL, 0, NULL, NULL);
+        if (size_needed > 0) {
+            std::vector<char> buffer(size_needed);
+            WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, buffer.data(), size_needed, NULL, NULL);
+            return std::string(buffer.data());
+        }
+        return "loj1897.config"; // Fallback
+    }
+
+    void SaveConfig() {
+        // Get current project path from text box
+        if (projectPathTextBox) {
+            const char* text = projectPathTextBox->GetText();
+            projectPath = text ? text : "";
+        }
+        
+        std::string configPath = GetConfigFilePath();
+        std::ofstream configFile(configPath);
+        if (configFile.is_open()) {
+            configFile << projectPath << "\n";
+            configFile.close();
+            
+            char buffer[512];
+            sprintf_s(buffer, "Saved config: Project path = %s\n", projectPath.c_str());
+            OutputDebugStringA(buffer);
+        }
+    }
+
+    void LoadConfig() {
+        std::string configPath = GetConfigFilePath();
+        std::ifstream configFile(configPath);
+        if (configFile.is_open()) {
+            std::getline(configFile, projectPath);
+            configFile.close();
+            
+            // Set the project path in the text box
+            if (projectPathTextBox && !projectPath.empty()) {
+                projectPathTextBox->SetText(projectPath.c_str());
+            }
+            
+            char buffer[512];
+            sprintf_s(buffer, "Loaded config: Project path = %s\n", projectPath.c_str());
+            OutputDebugStringA(buffer);
+        }
+        
+        // Update control states based on project path
+        UpdateControlStates();
+    }
+    
+    void UpdateControlStates() {
+        // Check if project path is empty
+        bool hasProjectPath = false;
+        if (projectPathTextBox) {
+            const char* text = projectPathTextBox->GetText();
+            hasProjectPath = (text != nullptr && strlen(text) > 0);
+        }
+        
+        // Enable/disable controls based on project path
+        if (seedTextBox) {
+            seedTextBox->SetIsEnabled(hasProjectPath);
+        }
+        if (playGameButton) {
+            playGameButton->SetIsEnabled(hasProjectPath);
+        }
+        if (fullscreenButton) {
+            fullscreenButton->SetIsEnabled(hasProjectPath);
+        }
+    }
+    
+    // Toggle fullscreen mode
+    void ToggleFullscreen() {
+        if (!windowHandle) return;
+        
+        if (!isFullscreen) {
+            // Save current window state
+            windowedStyle = GetWindowLong(windowHandle, GWL_STYLE);
+            windowedExStyle = GetWindowLong(windowHandle, GWL_EXSTYLE);
+            GetWindowRect(windowHandle, &windowedRect);
+            
+            // Get monitor info
+            MONITORINFO mi = { sizeof(mi) };
+            if (GetMonitorInfo(MonitorFromWindow(windowHandle, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+                // Remove window decorations and set fullscreen style
+                SetWindowLong(windowHandle, GWL_STYLE, windowedStyle & ~(WS_CAPTION | WS_THICKFRAME));
+                SetWindowLong(windowHandle, GWL_EXSTYLE, windowedExStyle & ~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+                
+                // Set window to cover entire monitor
+                SetWindowPos(windowHandle, HWND_TOP,
+                    mi.rcMonitor.left, mi.rcMonitor.top,
+                    mi.rcMonitor.right - mi.rcMonitor.left,
+                    mi.rcMonitor.bottom - mi.rcMonitor.top,
+                    SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                
+                isFullscreen = true;
+                
+                // Update button text
+                if (fullscreenButton) {
+                    fullscreenButton->SetContent("WINDOWED");
+                }
+            }
+        } else {
+            // Restore windowed mode
+            SetWindowLong(windowHandle, GWL_STYLE, windowedStyle);
+            SetWindowLong(windowHandle, GWL_EXSTYLE, windowedExStyle);
+            
+            SetWindowPos(windowHandle, HWND_NOTOPMOST,
+                windowedRect.left, windowedRect.top,
+                windowedRect.right - windowedRect.left,
+                windowedRect.bottom - windowedRect.top,
+                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            
+            isFullscreen = false;
+            
+            // Update button text
+            if (fullscreenButton) {
+                fullscreenButton->SetContent("FULLSCREEN");
+            }
+        }
+    }
 
     void Start() override {
         // Call parent Start first
         RenderPath3D::Start();
         setOutlineEnabled(true);
         InitializeNoesis();
+        LoadConfig();
     }
 
     void Stop() override {
@@ -201,8 +353,17 @@ private:
         }
 
         // Find main menu UI elements
+        projectPathTextBox = FindElementByName<Noesis::TextBox>(rootGrid, "ProjectPathTextBox");
         seedTextBox = FindElementByName<Noesis::TextBox>(rootGrid, "SeedTextBox");
         playGameButton = FindElementByName<Noesis::Button>(rootGrid, "PlayGameButton");
+        fullscreenButton = FindElementByName<Noesis::Button>(rootGrid, "FullscreenButton");
+
+        // Wire up project path text changed event to update control states
+        if (projectPathTextBox) {
+            projectPathTextBox->TextChanged() += [this](Noesis::BaseComponent *sender, const Noesis::RoutedEventArgs &args) {
+                UpdateControlStates();
+            };
+        }
 
         // Wire up event handlers
         if (playGameButton) {
@@ -216,6 +377,16 @@ private:
                 OutputDebugStringA(buffer);
             };
         }
+        
+        // Wire up fullscreen button
+        if (fullscreenButton) {
+            fullscreenButton->Click() += [this](Noesis::BaseComponent *sender, const Noesis::RoutedEventArgs &args) {
+                ToggleFullscreen();
+            };
+        }
+        
+        // Initial control state update
+        UpdateControlStates();
 
         // Create UserControl to wrap everything
         Noesis::Ptr<Noesis::UserControl> root = Noesis::MakePtr<Noesis::UserControl>();
@@ -275,8 +446,10 @@ private:
 
         uiView.Reset();
         noesisDevice.Reset();
+        projectPathTextBox.Reset();
         seedTextBox.Reset();
         playGameButton.Reset();
+        fullscreenButton.Reset();
         rootElement.Reset();
 
         if (frameFence) {
