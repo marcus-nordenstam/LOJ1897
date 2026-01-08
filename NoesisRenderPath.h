@@ -35,7 +35,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
 private:
     Noesis::Ptr<Noesis::RenderDevice> noesisDevice;
     Noesis::Ptr<Noesis::IView> uiView;
-    Noesis::Ptr<Noesis::TextBox> projectPathTextBox; // Project path input
     Noesis::Ptr<Noesis::TextBox> seedTextBox; // Seed input
     Noesis::Ptr<Noesis::Button> playGameButton; // Play game button
     Noesis::Ptr<Noesis::Button> fullscreenButton; // Fullscreen toggle button
@@ -45,10 +44,17 @@ private:
     
     // Saved settings
     std::string projectPath;
+    std::string themeMusic;
+    std::string levelPath;
+    std::string playerModel;
+    std::string npcModel;
     
     // Music playback
     wi::audio::Sound menuMusic;
     wi::audio::SoundInstance menuMusicInstance;
+    
+    // UI state
+    bool menuVisible = true;
     
     // Fullscreen state
     HWND windowHandle = nullptr;
@@ -75,7 +81,7 @@ public:
         if (lastSlash != std::wstring::npos) {
             path = path.substr(0, lastSlash + 1);
         }
-        path += L"loj1897.config";
+        path += L"config.ini";
 
         // Convert wide string to UTF-8
         int size_needed = WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, NULL, 0, NULL, NULL);
@@ -84,24 +90,22 @@ public:
             WideCharToMultiByte(CP_UTF8, 0, path.c_str(), -1, buffer.data(), size_needed, NULL, NULL);
             return std::string(buffer.data());
         }
-        return "loj1897.config"; // Fallback
+        return "config.ini"; // Fallback
     }
 
     void SaveConfig() {
-        // Get current project path from text box
-        if (projectPathTextBox) {
-            const char* text = projectPathTextBox->GetText();
-            projectPath = text ? text : "";
-        }
-        
         std::string configPath = GetConfigFilePath();
         std::ofstream configFile(configPath);
         if (configFile.is_open()) {
-            configFile << projectPath << "\n";
+            configFile << "project_path = " << projectPath << "\n";
+            configFile << "theme_music = " << themeMusic << "\n";
+            configFile << "level = " << levelPath << "\n";
+            configFile << "player_model = " << playerModel << "\n";
+            configFile << "npc_model = " << npcModel << "\n";
             configFile.close();
             
             char buffer[512];
-            sprintf_s(buffer, "Saved config: Project path = %s\n", projectPath.c_str());
+            sprintf_s(buffer, "Saved config: project_path = %s\n", projectPath.c_str());
             OutputDebugStringA(buffer);
         }
     }
@@ -110,16 +114,43 @@ public:
         std::string configPath = GetConfigFilePath();
         std::ifstream configFile(configPath);
         if (configFile.is_open()) {
-            std::getline(configFile, projectPath);
+            std::string line;
+            while (std::getline(configFile, line)) {
+                // Parse INI format: key = value
+                size_t equalsPos = line.find('=');
+                if (equalsPos != std::string::npos) {
+                    std::string key = line.substr(0, equalsPos);
+                    std::string value = line.substr(equalsPos + 1);
+                    
+                    // Trim whitespace from key and value
+                    key.erase(0, key.find_first_not_of(" \t\r\n"));
+                    key.erase(key.find_last_not_of(" \t\r\n") + 1);
+                    value.erase(0, value.find_first_not_of(" \t\r\n"));
+                    value.erase(value.find_last_not_of(" \t\r\n") + 1);
+                    
+                    // Remove quotes from value if present
+                    if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    if (key == "project_path") {
+                        projectPath = value;
+                    } else if (key == "theme_music") {
+                        themeMusic = value;
+                    } else if (key == "level") {
+                        levelPath = value;
+                    } else if (key == "player_model") {
+                        playerModel = value;
+                    } else if (key == "npc_model") {
+                        npcModel = value;
+                    }
+                }
+            }
             configFile.close();
             
-            // Set the project path in the text box
-            if (projectPathTextBox && !projectPath.empty()) {
-                projectPathTextBox->SetText(projectPath.c_str());
-            }
-            
             char buffer[512];
-            sprintf_s(buffer, "Loaded config: Project path = %s\n", projectPath.c_str());
+            sprintf_s(buffer, "Loaded config:\n  project_path = %s\n  theme_music = %s\n  level = %s\n", 
+                     projectPath.c_str(), themeMusic.c_str(), levelPath.c_str());
             OutputDebugStringA(buffer);
         }
         
@@ -128,16 +159,8 @@ public:
     }
     
     void UpdateControlStates() {
-        // Check if project path is empty
-        bool hasProjectPath = false;
-        std::string currentProjectPath;
-        if (projectPathTextBox) {
-            const char* text = projectPathTextBox->GetText();
-            hasProjectPath = (text != nullptr && strlen(text) > 0);
-            if (hasProjectPath) {
-                currentProjectPath = text;
-            }
-        }
+        // Check if project path is set from config file
+        bool hasProjectPath = !projectPath.empty();
         
         // Enable/disable controls based on project path
         if (seedTextBox) {
@@ -152,7 +175,7 @@ public:
         
         // Load and play music if project path is set and music isn't already playing
         if (hasProjectPath && !menuMusicInstance.IsValid()) {
-            LoadAndPlayMenuMusic(currentProjectPath);
+            LoadAndPlayMenuMusic();
         }
         // Stop music if project path is cleared
         else if (!hasProjectPath && menuMusicInstance.IsValid()) {
@@ -162,14 +185,25 @@ public:
         }
     }
     
-    void LoadAndPlayMenuMusic(const std::string& projPath) {
-        // Construct music file path
-        // WickedEngine supports WAV, OGG Vorbis, and MP3 formats
-        std::string musicPath = projPath;
-        if (!musicPath.empty() && musicPath.back() != '/' && musicPath.back() != '\\') {
-            musicPath += "/";
+    void LoadAndPlayMenuMusic() {
+        // Use theme_music from config, or fall back to default
+        if (themeMusic.empty()) {
+            OutputDebugStringA("No theme_music configured in config.ini\n");
+            return;
         }
-        musicPath += "SharedContent/Music/Dataspel Tema 4_4 Em 144-v2.mp3";
+        
+        // Construct full music file path
+        // WickedEngine supports WAV, OGG Vorbis, and MP3 formats
+        std::string musicPath = projectPath;
+        if (!musicPath.empty() && musicPath.back() != '/' && musicPath.back() != '\\') {
+            musicPath += "\\";
+        }
+        musicPath += themeMusic;
+        
+        // Normalize path separators
+        for (char& c : musicPath) {
+            if (c == '/') c = '\\';
+        }
         
         // Check if file exists
         if (!wi::helper::FileExists(musicPath)) {
@@ -208,6 +242,106 @@ public:
         } else {
             char buffer[512];
             sprintf_s(buffer, "Failed to load music: %s\n", musicPath.c_str());
+            OutputDebugStringA(buffer);
+        }
+    }
+    
+    void LoadGameScene() {
+        if (levelPath.empty()) {
+            OutputDebugStringA("ERROR: No level path configured in config.ini\n");
+            return;
+        }
+        
+        // Construct full scene file path
+        std::string scenePath = projectPath;
+        if (!scenePath.empty() && scenePath.back() != '/' && scenePath.back() != '\\') {
+            scenePath += "\\";
+        }
+        scenePath += levelPath;
+        
+        // Normalize path separators
+        for (char& c : scenePath) {
+            if (c == '/') c = '\\';
+        }
+        
+        char buffer[512];
+        sprintf_s(buffer, "Loading scene: %s\n", scenePath.c_str());
+        OutputDebugStringA(buffer);
+        
+        // Check if file exists
+        if (!wi::helper::FileExists(scenePath)) {
+            sprintf_s(buffer, "ERROR: Scene file not found: %s\n", scenePath.c_str());
+            OutputDebugStringA(buffer);
+            return;
+        }
+        
+        // Get the current scene
+        wi::scene::Scene& scene = wi::scene::GetScene();
+        
+        // Clear existing scene
+        scene.Clear();
+        
+        // Load the new scene
+        wi::Archive archive(scenePath);
+        archive.SetSourceDirectory(wi::helper::InferProjectPath(scenePath));
+        if (archive.IsOpen()) {
+            scene.Serialize(archive);
+            
+            OutputDebugStringA("Scene loaded successfully\n");
+            
+            // Update scene to compute bounds
+            scene.Update(0.0f);
+            
+            // Get scene bounds (automatically computed by the scene)
+            XMFLOAT3 sceneMin = scene.bounds.getMin();
+            XMFLOAT3 sceneMax = scene.bounds.getMax();
+            
+            // Calculate center point
+            XMFLOAT3 center = scene.bounds.getCenter();
+            
+            // Calculate scene size for camera distance
+            float sizeX = sceneMax.x - sceneMin.x;
+            float sizeY = sceneMax.y - sceneMin.y;
+            float sizeZ = sceneMax.z - sceneMin.z;
+            float maxSize = std::max(std::max(sizeX, sizeY), sizeZ);
+            
+            // Position camera at center, offset back and up to view the scene
+            float cameraDistance = maxSize * 1.5f; // 1.5x scene size for good viewing
+            
+            XMFLOAT3 cameraPos;
+            cameraPos.x = center.x;
+            cameraPos.y = center.y + maxSize * 0.3f; // Slightly elevated
+            cameraPos.z = center.z + cameraDistance;
+            
+            // Set camera transform
+            wi::scene::TransformComponent cameraTransform;
+            cameraTransform.ClearTransform();
+            cameraTransform.Translate(cameraPos);
+            cameraTransform.UpdateTransform();
+            
+            // Look at the center
+            XMVECTOR Eye = XMLoadFloat3(&cameraPos);
+            XMVECTOR At = XMLoadFloat3(&center);
+            XMVECTOR Up = XMVectorSet(0, 1, 0, 0);
+            
+            XMMATRIX view = XMMatrixLookAtLH(Eye, At, Up);
+            XMMATRIX viewInv = XMMatrixInverse(nullptr, view);
+            
+            XMFLOAT4X4 worldMatrix;
+            XMStoreFloat4x4(&worldMatrix, viewInv);
+            cameraTransform.world = worldMatrix;
+            cameraTransform.SetDirty();
+            
+            // Apply to camera
+            camera->TransformCamera(cameraTransform);
+            camera->UpdateCamera();
+            
+            sprintf_s(buffer, "Camera positioned at scene center: (%.2f, %.2f, %.2f)\n", 
+                     cameraPos.x, cameraPos.y, cameraPos.z);
+            OutputDebugStringA(buffer);
+            
+        } else {
+            sprintf_s(buffer, "ERROR: Failed to open scene archive: %s\n", scenePath.c_str());
             OutputDebugStringA(buffer);
         }
     }
@@ -287,8 +421,8 @@ public:
         // Call parent PreRender first (sets up Wicked Engine rendering)
         RenderPath3D::PreRender();
 
-        // Now do Noesis offscreen rendering before main render target is bound
-        if (uiView && noesisDevice) {
+        // Now do Noesis offscreen rendering before main render target is bound (only if menu is visible)
+        if (menuVisible && uiView && noesisDevice) {
             wi::graphics::GraphicsDevice *device = wi::graphics::GetDevice();
             wi::graphics::CommandList cmd = device->BeginCommandList();
 
@@ -326,8 +460,8 @@ public:
         // Call parent Compose first (Wicked Engine composes its layers to backbuffer)
         RenderPath3D::Compose(cmd);
 
-        // Now render Noesis UI on top of everything
-        if (uiView && noesisDevice) {
+        // Now render Noesis UI on top of everything (only if menu is visible)
+        if (menuVisible && uiView && noesisDevice) {
             wi::graphics::GraphicsDevice *device = wi::graphics::GetDevice();
             wi::graphics::GraphicsDevice_DX12 *dx12Device =
                     static_cast<wi::graphics::GraphicsDevice_DX12 *>(device);
@@ -427,28 +561,35 @@ private:
         }
 
         // Find main menu UI elements
-        projectPathTextBox = FindElementByName<Noesis::TextBox>(rootGrid, "ProjectPathTextBox");
         seedTextBox = FindElementByName<Noesis::TextBox>(rootGrid, "SeedTextBox");
         playGameButton = FindElementByName<Noesis::Button>(rootGrid, "PlayGameButton");
         fullscreenButton = FindElementByName<Noesis::Button>(rootGrid, "FullscreenButton");
-
-        // Wire up project path text changed event to update control states
-        if (projectPathTextBox) {
-            projectPathTextBox->TextChanged() += [this](Noesis::BaseComponent *sender, const Noesis::RoutedEventArgs &args) {
-                UpdateControlStates();
-            };
-        }
 
         // Wire up event handlers
         if (playGameButton) {
             playGameButton->Click() += [this](Noesis::BaseComponent *sender, const Noesis::RoutedEventArgs &args) {
                 // Get seed value
                 const char *seedText = seedTextBox ? seedTextBox->GetText() : "12345";
-                // TODO: Start game with seed
-                // For now, just output to debug
-                char buffer[256];
+                
+                char buffer[512];
                 sprintf_s(buffer, "Starting game with seed: %s\n", seedText);
                 OutputDebugStringA(buffer);
+                
+                // Hide the menu
+                menuVisible = false;
+                if (rootElement) {
+                    rootElement->SetVisibility(Noesis::Visibility_Collapsed);
+                }
+                
+                // Stop menu music
+                if (menuMusicInstance.IsValid()) {
+                    wi::audio::Stop(&menuMusicInstance);
+                    menuMusicInstance = {};
+                    menuMusic = {};
+                }
+                
+                // Load the scene
+                LoadGameScene();
             };
         }
         
@@ -525,7 +666,6 @@ private:
 
         uiView.Reset();
         noesisDevice.Reset();
-        projectPathTextBox.Reset();
         seedTextBox.Reset();
         playGameButton.Reset();
         fullscreenButton.Reset();

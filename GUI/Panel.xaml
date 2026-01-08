@@ -84,8 +84,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>  <!-- Title -->
             <RowDefinition Height="60"/>    <!-- Spacer -->
-            <RowDefinition Height="Auto"/>  <!-- Project Path Label + Input -->
-            <RowDefinition Height="30"/>    <!-- Spacer -->
             <RowDefinition Height="Auto"/>  <!-- Seed Label + Input (horizontal) -->
             <RowDefinition Height="60"/>    <!-- Spacer -->
             <RowDefinition Height="Auto"/>  <!-- Play Button -->
@@ -100,22 +98,8 @@
                    FontWeight="Bold"
                    HorizontalAlignment="Center"/>
 
-        <!-- Project Path Label + Input (Horizontal) -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <TextBlock Text="Project Path:"
-                       FontSize="24"
-                       VerticalAlignment="Center"
-                       Margin="0,0,15,0"/>
-            <TextBox x:Name="ProjectPathTextBox"
-                     Width="400"
-                     Height="50"
-                     VerticalAlignment="Center"
-                     TextAlignment="Left"
-                     Text=""/>
-        </StackPanel>
-
         <!-- Seed Label + Input (Horizontal) -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
             <TextBlock Text="History Seed:"
                        FontSize="24"
                        VerticalAlignment="Center"
@@ -129,14 +113,14 @@
         </StackPanel>
 
         <!-- Play Game Button -->
-        <Button Grid.Row="6"
+        <Button Grid.Row="4"
                 x:Name="PlayGameButton"
                 Content="PLAY GAME"
                 HorizontalAlignment="Center"
                 Cursor="Hand"/>
 
         <!-- Fullscreen Toggle Button -->
-        <Button Grid.Row="8"
+        <Button Grid.Row="6"
                 x:Name="FullscreenButton"
                 Content="FULLSCREEN"
                 HorizontalAlignment="Center"
