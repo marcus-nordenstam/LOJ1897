@@ -42,6 +42,8 @@ class NoesisRenderPath : public wi::RenderPath3D {
     Noesis::Ptr<Noesis::Button> playGameButton;        // Play game button
     Noesis::Ptr<Noesis::Button> fullscreenButton;      // Fullscreen toggle button
     Noesis::Ptr<Noesis::FrameworkElement> rootElement; // Root element from XAML
+    Noesis::Ptr<Noesis::Grid> menuContainer;           // Menu container (hidden during gameplay)
+    Noesis::Ptr<Noesis::FrameworkElement> talkIndicator; // Talk indicator (shown when aiming at NPC)
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
 
@@ -987,8 +989,8 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 if (escPressed && !escWasPressed) {
                     SetFirstPersonMode(false);
                     menuVisible = true;
-                    if (rootElement) {
-                        rootElement->SetVisibility(Noesis::Visibility_Visible);
+                    if (menuContainer) {
+                        menuContainer->SetVisibility(Noesis::Visibility_Visible);
                     }
                     CleanupNPCScripts();
                     aimDotVisible = false;
@@ -1111,6 +1113,13 @@ class NoesisRenderPath : public wi::RenderPath3D {
                         }
                     }
                 }
+
+                // Update Noesis Talk indicator visibility (only during gameplay)
+                if (talkIndicator) {
+                    talkIndicator->SetVisibility(
+                        (!menuVisible && aimingAtNPC) ? Noesis::Visibility_Visible
+                                                      : Noesis::Visibility_Collapsed);
+                }
             }
 
             // Update NPC behavior via Lua scripts (like walkabout)
@@ -1138,9 +1147,8 @@ class NoesisRenderPath : public wi::RenderPath3D {
         // Call parent PreRender first (sets up Wicked Engine rendering)
         RenderPath3D::PreRender();
 
-        // Now do Noesis offscreen rendering before main render target is bound (only if menu is
-        // visible)
-        if (menuVisible && uiView && noesisDevice) {
+        // Noesis offscreen rendering before main render target is bound
+        if (uiView && noesisDevice) {
             wi::graphics::GraphicsDevice *device = wi::graphics::GetDevice();
             wi::graphics::CommandList cmd = device->BeginCommandList();
 
@@ -1214,61 +1222,10 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 wi::image::Draw(nullptr, params, cmd);
             }
 
-            // NPC interaction indicator (Talk)
-            if (aimingAtNPC) {
-                wi::font::SetCanvas(*this);
-
-                float indicatorX = aimDotScreenPos.x + 20.0f; // 20px to the right of aim dot
-                float indicatorY = aimDotScreenPos.y;
-
-                // Black filled circle background
-                {
-                    wi::image::Params params;
-                    float circleSize = 24.0f;
-                    params.pos =
-                        XMFLOAT3(indicatorX - circleSize * 0.5f, indicatorY - circleSize * 0.5f, 0);
-                    params.siz = XMFLOAT2(circleSize, circleSize);
-                    params.pivot = XMFLOAT2(0, 0);
-                    params.color = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.9f); // Black, 90% opacity
-                    params.blendFlag = wi::enums::BLENDMODE_ALPHA;
-                    params.enableCornerRounding();
-                    float radius = circleSize * 0.5f;
-                    params.corners_rounding[0] = {radius, 12};
-                    params.corners_rounding[1] = {radius, 12};
-                    params.corners_rounding[2] = {radius, 12};
-                    params.corners_rounding[3] = {radius, 12};
-                    wi::image::Draw(nullptr, params, cmd);
-                }
-
-                // White "T" letter inside circle
-                {
-                    wi::font::Params params;
-                    params.posX = indicatorX;
-                    params.posY = indicatorY;
-                    params.size = 16;
-                    params.h_align = wi::font::WIFALIGN_CENTER;
-                    params.v_align = wi::font::WIFALIGN_CENTER;
-                    params.color = wi::Color::White();
-                    wi::font::Draw("T", params, cmd);
-                }
-
-                // "Talk" text beside the circle
-                {
-                    wi::font::Params params;
-                    params.posX = indicatorX + 18.0f; // Right of circle
-                    params.posY = indicatorY;
-                    params.size = 14;
-                    params.h_align = wi::font::WIFALIGN_LEFT;
-                    params.v_align = wi::font::WIFALIGN_CENTER;
-                    params.color = wi::Color::White();
-                    params.shadowColor = wi::Color(0, 0, 0, 200);
-                    wi::font::Draw("Talk", params, cmd);
-                }
-            }
         }
 
-        // Now render Noesis UI on top of everything (only if menu is visible)
-        if (menuVisible && uiView && noesisDevice) {
+        // Render Noesis UI on top of everything
+        if (uiView && noesisDevice) {
             wi::graphics::GraphicsDevice *device = wi::graphics::GetDevice();
             wi::graphics::GraphicsDevice_DX12 *dx12Device =
                 static_cast<wi::graphics::GraphicsDevice_DX12 *>(device);
@@ -1369,9 +1326,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
         }
 
         // Find main menu UI elements
+        menuContainer = FindElementByName<Noesis::Grid>(rootGrid, "MenuContainer");
         seedTextBox = FindElementByName<Noesis::TextBox>(rootGrid, "SeedTextBox");
         playGameButton = FindElementByName<Noesis::Button>(rootGrid, "PlayGameButton");
         fullscreenButton = FindElementByName<Noesis::Button>(rootGrid, "FullscreenButton");
+        talkIndicator = FindElementByName<Noesis::FrameworkElement>(rootGrid, "TalkIndicator");
 
         // Wire up event handlers
         if (playGameButton) {
@@ -1386,8 +1345,8 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
                     // Hide the menu
                     menuVisible = false;
-                    if (rootElement) {
-                        rootElement->SetVisibility(Noesis::Visibility_Collapsed);
+                    if (menuContainer) {
+                        menuContainer->SetVisibility(Noesis::Visibility_Collapsed);
                     }
 
                     // Stop menu music
@@ -1476,6 +1435,8 @@ class NoesisRenderPath : public wi::RenderPath3D {
         seedTextBox.Reset();
         playGameButton.Reset();
         fullscreenButton.Reset();
+        menuContainer.Reset();
+        talkIndicator.Reset();
         rootElement.Reset();
 
         if (frameFence) {

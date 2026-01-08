@@ -3,12 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     HorizontalAlignment="Stretch"
     VerticalAlignment="Stretch">
-    
-    <!-- Background with MainMenu.png -->
-    <Grid.Background>
-        <ImageBrush ImageSource="MainMenu.png" Stretch="UniformToFill"/>
-    </Grid.Background>
-        
+
     <Grid.Resources>
         <ResourceDictionary>
             <!-- Style for TextBox with dark background -->
@@ -79,55 +74,94 @@
         </ResourceDictionary>
     </Grid.Resources>
 
-    <!-- Main Menu Content - Positioned on the right side -->
-    <Grid HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,150,0">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- Title -->
-            <RowDefinition Height="60"/>    <!-- Spacer -->
-            <RowDefinition Height="Auto"/>  <!-- Seed Label + Input (horizontal) -->
-            <RowDefinition Height="60"/>    <!-- Spacer -->
-            <RowDefinition Height="Auto"/>  <!-- Play Button -->
-            <RowDefinition Height="20"/>    <!-- Small Spacer -->
-            <RowDefinition Height="Auto"/>  <!-- Fullscreen Button -->
-        </Grid.RowDefinitions>
+    <!-- Menu Container (hidden during gameplay) -->
+    <Grid x:Name="MenuContainer">
+        <!-- Background with MainMenu.png -->
+        <Grid.Background>
+            <ImageBrush ImageSource="MainMenu.png" Stretch="UniformToFill"/>
+        </Grid.Background>
 
-        <!-- Game Title -->
-        <TextBlock Grid.Row="0"
-                   Text="LEGENDS OF JUSTICE: 1897"
-                   FontSize="48"
-                   FontWeight="Bold"
-                   HorizontalAlignment="Center"/>
+        <!-- Main Menu Content - Positioned on the right side -->
+        <Grid HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,150,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>  <!-- Title -->
+                <RowDefinition Height="60"/>    <!-- Spacer -->
+                <RowDefinition Height="Auto"/>  <!-- Seed Label + Input (horizontal) -->
+                <RowDefinition Height="60"/>    <!-- Spacer -->
+                <RowDefinition Height="Auto"/>  <!-- Play Button -->
+                <RowDefinition Height="20"/>    <!-- Small Spacer -->
+                <RowDefinition Height="Auto"/>  <!-- Fullscreen Button -->
+            </Grid.RowDefinitions>
 
-        <!-- Seed Label + Input (Horizontal) -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <TextBlock Text="History Seed:"
-                       FontSize="24"
-                       VerticalAlignment="Center"
-                       Margin="0,0,15,0"/>
-            <TextBox x:Name="SeedTextBox"
-                     Width="250"
-                     Height="50"
-                     VerticalAlignment="Center"
-                     TextAlignment="Center"
-                     Text="12345"/>
-        </StackPanel>
+            <!-- Game Title -->
+            <TextBlock Grid.Row="0"
+                       Text="LEGENDS OF JUSTICE: 1897"
+                       FontSize="48"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"/>
 
-        <!-- Play Game Button -->
-        <Button Grid.Row="4"
-                x:Name="PlayGameButton"
-                Content="PLAY GAME"
-                HorizontalAlignment="Center"
-                Cursor="Hand"/>
+            <!-- Seed Label + Input (Horizontal) -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock Text="History Seed:"
+                           FontSize="24"
+                           VerticalAlignment="Center"
+                           Margin="0,0,15,0"/>
+                <TextBox x:Name="SeedTextBox"
+                         Width="250"
+                         Height="50"
+                         VerticalAlignment="Center"
+                         TextAlignment="Center"
+                         Text="12345"/>
+            </StackPanel>
 
-        <!-- Fullscreen Toggle Button -->
-        <Button Grid.Row="6"
-                x:Name="FullscreenButton"
-                Content="FULLSCREEN"
-                HorizontalAlignment="Center"
-                Cursor="Hand"
-                FontSize="20"
-                Padding="30,10,30,10"/>
+            <!-- Play Game Button -->
+            <Button Grid.Row="4"
+                    x:Name="PlayGameButton"
+                    Content="PLAY GAME"
+                    HorizontalAlignment="Center"
+                    Cursor="Hand"/>
 
+            <!-- Fullscreen Toggle Button -->
+            <Button Grid.Row="6"
+                    x:Name="FullscreenButton"
+                    Content="FULLSCREEN"
+                    HorizontalAlignment="Center"
+                    Cursor="Hand"
+                    FontSize="20"
+                    Padding="30,10,30,10"/>
+        </Grid>
     </Grid>
+
+    <!-- Talk Indicator (shown when aiming at NPC, outside MenuContainer) -->
+    <StackPanel x:Name="TalkIndicator"
+                Orientation="Horizontal"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Margin="40,0,0,0"
+                Visibility="Collapsed">
+        <!-- Black circle with T -->
+        <Grid Width="28" Height="28" Margin="0,0,8,0">
+            <Ellipse Fill="#E0000000"/>
+            <TextBlock Text="T"
+                       FontSize="16"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center">
+                <TextBlock.Effect>
+                    <DropShadowEffect ShadowDepth="0" BlurRadius="0"/>
+                </TextBlock.Effect>
+            </TextBlock>
+        </Grid>
+        <!-- Talk text -->
+        <TextBlock Text="Talk"
+                   FontSize="18"
+                   Foreground="White"
+                   VerticalAlignment="Center">
+            <TextBlock.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
+            </TextBlock.Effect>
+        </TextBlock>
+    </StackPanel>
 
 </Grid>
