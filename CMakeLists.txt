@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.19)
 project(LOJ1897)
 set(CMAKE_CXX_STANDARD 23)
 
+# Enable parallel builds by default
+if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
+    include(ProcessorCount)
+    ProcessorCount(N)
+    if(NOT N EQUAL 0)
+        set(CMAKE_BUILD_PARALLEL_LEVEL ${N} CACHE STRING "Number of parallel build jobs")
+        message(STATUS "Setting parallel build level to ${N} (number of processors)")
+    endif()
+endif()
+
 # Source files
 set(SOURCE_FILES
     main.cpp
@@ -18,6 +28,7 @@ set(WICKED_ROOT_DIR "E:/Repos/WickedLOJ" CACHE PATH "Path to WickedLOJ repositor
 set(WICKED_ENGINE_DIR "${WICKED_ROOT_DIR}/WickedEngine")
 set(WICKED_BUILD_DIR_RELEASE "${WICKED_ROOT_DIR}/cmake-build-release-visual-studio/WickedEngine" CACHE PATH "Path to WickedEngine Release build directory")
 set(WICKED_BUILD_DIR_DEBUG "${WICKED_ROOT_DIR}/cmake-build-debug-visual-studio/WickedEngine" CACHE PATH "Path to WickedEngine Debug build directory")
+set(WICKED_SHADERS_DIR "${WICKED_ROOT_DIR}/cmake-build-release-visual-studio/Editor/shaders" CACHE PATH "Path to pre-compiled shaders")
 
 # Set NoesisGUI paths
 set(NOESISGUI_ROOT_DIR "E:/3rdparty/NoesisGUI-NativeSDK-win-3.2.10-Indie" CACHE PATH "Path to NoesisGUI root directory")
@@ -117,7 +128,20 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 )
 
 if(MSVC)
+    # Enable multi-processor compilation with maximum available processors
     add_compile_options(/MP)
+    
+    # Enable parallel build at project level
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    
+    # Set Visual Studio to build multiple projects in parallel
+    set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+    
+    # Enable faster PDB generation for parallel builds
+    add_compile_options(/FS)
+    
+    # Use faster linker
+    add_link_options(/DEBUG:FASTLINK)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -156,6 +180,7 @@ endif()
 
 message(STATUS "libdxcompiler found at ${LIBDXCOMPILER_PATH}")
 message(STATUS "startup lua found at ${STARTUP_LUA}")
+message(STATUS "Pre-compiled shaders: ${WICKED_SHADERS_DIR}")
 message(STATUS "NoesisGUI directory: ${NOESISGUI_ROOT_DIR}")
 message(STATUS "NoesisGUI include: ${NOESISGUI_INCLUDE_DIR}")
 message(STATUS "NoesisGUI library: ${NOESISGUI_LIB_DIR}/Noesis.lib")
@@ -168,7 +193,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${STARTUP_LUA} ${CMAKE_CURRENT_BINARY_DIR}/startup.lua
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NOESISGUI_BIN_DIR}/Noesis.dll ${CMAKE_CURRENT_BINARY_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/GUI ${CMAKE_CURRENT_BINARY_DIR}/GUI
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "E:/Repos/WickedLOJ/WickedEngine/shaders" ${CMAKE_CURRENT_BINARY_DIR}/WickedEngine/shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${WICKED_SHADERS_DIR} ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Logo.png ${CMAKE_CURRENT_BINARY_DIR}/Logo.png
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/MainMenu.png ${CMAKE_CURRENT_BINARY_DIR}/GUI/MainMenu.png
 )
@@ -181,7 +206,7 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lightsetup.wiscene)
     )
 endif()
 
-# Create Publish folder for Release builds only
+# Create Publish folder for Publish build configuration only
 # Add POST_BUILD command that conditionally creates Publish folder
 add_custom_command(
     TARGET ${PROJECT_NAME} POST_BUILD
@@ -191,7 +216,8 @@ add_custom_command(
         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
         -DLIBDXCOMPILER_PATH=${LIBDXCOMPILER_PATH}
         -DNOESISGUI_BIN_DIR=${NOESISGUI_BIN_DIR}
+        -DWICKED_SHADERS_DIR=${WICKED_SHADERS_DIR}
         -DTARGET_FILE=$<TARGET_FILE:${PROJECT_NAME}>
         -P ${CMAKE_CURRENT_SOURCE_DIR}/CreatePublish.cmake
-    COMMENT "Creating Publish folder for Release build"
+    COMMENT "Creating Publish folder if build configuration is Publish"
 )

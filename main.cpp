@@ -431,9 +431,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     std::string exePath = wi::helper::GetExecutablePath();
     std::string exeDir = wi::helper::GetDirectoryFromPath(exePath);
 
-    // Setup shader paths
-    wi::renderer::SetShaderSourcePath(exeDir + "WickedEngine/shaders/");
+    // Setup shader paths (using pre-compiled shaders only)
+    // WickedEngine expects platform-specific subdirectory (hlsl6/ for DX12)
     wi::renderer::SetShaderPath(exeDir + "shaders/");
+    wi::renderer::SetShaderPath(wi::renderer::GetShaderPath() + "hlsl6/");
 
     wi::scene::Scene &scene = wi::scene::GetScene();
 

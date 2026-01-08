@@ -1,8 +1,8 @@
-# CreatePublish.cmake - Script to create Publish folder only for Release builds
+# CreatePublish.cmake - Script to create Publish folder only for Publish builds
 
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    # For multi-config generators, check if we're in a Release configuration
-    # This script is called with -DCMAKE_BUILD_TYPE=$<CONFIG> which will be "Release" for Release builds
+if(CMAKE_BUILD_TYPE STREQUAL "Publish")
+    # For multi-config generators, check if we're in a Publish configuration
+    # This script is called with -DCMAKE_BUILD_TYPE=$<CONFIG> which will be "Publish" for Publish builds
     
     message(STATUS "Creating Publish folder...")
     
@@ -12,8 +12,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     # Copy GUI folder
     file(COPY ${SOURCE_DIR}/GUI DESTINATION ${BINARY_DIR}/LOJ1897)
     
-    # Copy Shaders folder
-    file(COPY "E:/Repos/WickedLOJ/WickedEngine/shaders" DESTINATION ${BINARY_DIR}/LOJ1897/WickedEngine)
+    # Copy pre-compiled Shaders folder
+    file(COPY ${WICKED_SHADERS_DIR} DESTINATION ${BINARY_DIR}/LOJ1897)
     
     # Copy individual files with correct names
     execute_process(
@@ -47,5 +47,5 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     
     message(STATUS "Publish folder created successfully")
 else()
-    message(STATUS "Skipping Publish folder creation (not a Release build: ${CMAKE_BUILD_TYPE})")
+    message(STATUS "Skipping Publish folder creation (not a Publish build: ${CMAKE_BUILD_TYPE})")
 endif()
