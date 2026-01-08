@@ -79,6 +79,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Aim dot (reticle) - raycast from character's eye in camera direction
     bool aimDotVisible = false;
     XMFLOAT2 aimDotScreenPos = {0, 0};
+    bool aimingAtNPC = false; // True if aim ray hits an NPC
 
     // Fullscreen state
     HWND windowHandle = nullptr;
@@ -1049,65 +1050,64 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 camera->TransformCamera(cameraTransform);
                 camera->UpdateCamera();
 
-                // === HEAD LOOK & AIM DOT ===
+                // === AIM DOT & NPC DETECTION ===
                 aimDotVisible = false;
+                aimingAtNPC = false;
 
-                // Get humanoid component for eye position
-                auto *humanoid = scene.cc_humanoids.GetComponent(playerChar->humanoidEntity);
-                if (humanoid != nullptr) {
-                    wi::ecs::Entity rightEyeBone =
-                        humanoid->bones[wi::scene::CCHumanoidComponent::kRightEyeBoneIndex];
+                // Aim dot fixed at screen center
+                aimDotScreenPos.x = GetLogicalWidth() * 0.5f;
+                aimDotScreenPos.y = GetLogicalHeight() * 0.5f;
+                aimDotVisible = true;
 
-                    if (rightEyeBone != wi::ecs::INVALID_ENTITY) {
-                        wi::scene::TransformComponent *eyeTransform =
-                            scene.transforms.GetComponent(rightEyeBone);
+                // Ray from camera in camera's look direction (same as through screen center)
+                XMFLOAT3 camLookDir;
+                XMStoreFloat3(&camLookDir, camera->GetAt());
 
-                        if (eyeTransform != nullptr) {
-                            XMFLOAT3 eyePos = eyeTransform->GetPosition();
+                // Raycast from camera in look direction
+                wi::primitive::Ray aimRay(camPos, camLookDir, 0.1f, 100.0f);
+                auto aimHit = scene.Intersects(
+                    aimRay, wi::enums::FILTER_OPAQUE | wi::enums::FILTER_TRANSPARENT, ~0u);
 
-                            // Use body facing direction for aim ray
-                            XMFLOAT3 bodyDir = playerChar->GetFacing();
+                // Calculate target point (hit or 100 units out)
+                XMFLOAT3 targetPoint;
+                if (aimHit.entity != wi::ecs::INVALID_ENTITY) {
+                    targetPoint.x = camPos.x + camLookDir.x * aimHit.distance;
+                    targetPoint.y = camPos.y + camLookDir.y * aimHit.distance;
+                    targetPoint.z = camPos.z + camLookDir.z * aimHit.distance;
+                } else {
+                    targetPoint.x = camPos.x + camLookDir.x * 100.0f;
+                    targetPoint.y = camPos.y + camLookDir.y * 100.0f;
+                    targetPoint.z = camPos.z + camLookDir.z * 100.0f;
+                }
 
-                            // Ray origin slightly out from eye in body direction
-                            XMFLOAT3 rayOrigin;
-                            rayOrigin.x = eyePos.x + bodyDir.x * 0.4f;
-                            rayOrigin.y = eyePos.y + bodyDir.y * 0.4f;
-                            rayOrigin.z = eyePos.z + bodyDir.z * 0.4f;
+                // Draw debug line (transparent green)
+                wi::renderer::RenderableLine debugLine;
+                debugLine.start = camPos;
+                debugLine.end = targetPoint;
+                debugLine.color_start = XMFLOAT4(0, 1, 0, 0.3f); // Green, transparent
+                debugLine.color_end = XMFLOAT4(0, 1, 0, 0.3f);
+                wi::renderer::DrawLine(debugLine);
 
-                            // Raycast in body facing direction
-                            wi::primitive::Ray aimRay(rayOrigin, bodyDir, 0.0f, 99.0f);
-                            auto aimHit = scene.Intersects(
-                                aimRay, wi::enums::FILTER_OPAQUE | wi::enums::FILTER_TRANSPARENT,
-                                ~0u);
-
-                            // Calculate target point (hit or 100 units from eye)
-                            XMFLOAT3 targetPoint;
-                            float aimDistance;
-                            if (aimHit.entity != wi::ecs::INVALID_ENTITY) {
-                                aimDistance = aimHit.distance;
-                                targetPoint.x = rayOrigin.x + bodyDir.x * aimDistance;
-                                targetPoint.y = rayOrigin.y + bodyDir.y * aimDistance;
-                                targetPoint.z = rayOrigin.z + bodyDir.z * aimDistance;
-                            } else {
-                                aimDistance = 99.0f;
-                                targetPoint.x = rayOrigin.x + bodyDir.x * 99.0f;
-                                targetPoint.y = rayOrigin.y + bodyDir.y * 99.0f;
-                                targetPoint.z = rayOrigin.z + bodyDir.z * 99.0f;
-                            }
-
-                            // Draw debug line (transparent green)
-                            /*
-                            wi::renderer::RenderableLine debugLine;
-                            debugLine.start = rayOrigin;
-                            debugLine.end = targetPoint;
-                            debugLine.color_start = XMFLOAT4(0, 1, 0, 0.3f); // Green, transparent
-                            debugLine.color_end = XMFLOAT4(0, 1, 0, 0.3f);
-                            wi::renderer::DrawLine(debugLine);
-                            */
-                            // Aim dot fixed at screen center
-                            aimDotScreenPos.x = GetLogicalWidth() * 0.5f;
-                            aimDotScreenPos.y = GetLogicalHeight() * 0.5f;
-                            aimDotVisible = true;
+                // Check if we hit an NPC
+                if (aimHit.entity != wi::ecs::INVALID_ENTITY) {
+                    // Check if hit entity or any ancestor is an NPC
+                    wi::ecs::Entity checkEntity = aimHit.entity;
+                    for (int depth = 0; depth < 10 && checkEntity != wi::ecs::INVALID_ENTITY;
+                         ++depth) {
+                        // Check if this entity has a MindComponent with NPC type
+                        const wi::scene::MindComponent *mind =
+                            scene.minds.GetComponent(checkEntity);
+                        if (mind != nullptr && mind->IsNPC()) {
+                            aimingAtNPC = true;
+                            break;
+                        }
+                        // Check parent via hierarchy
+                        const wi::scene::HierarchyComponent *hier =
+                            scene.hierarchy.GetComponent(checkEntity);
+                        if (hier != nullptr) {
+                            checkEntity = hier->parentID;
+                        } else {
+                            break;
                         }
                     }
                 }
@@ -1212,6 +1212,58 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 params.corners_rounding[2] = {2.0f, 8}; // Bottom-left
                 params.corners_rounding[3] = {2.0f, 8}; // Bottom-right
                 wi::image::Draw(nullptr, params, cmd);
+            }
+
+            // NPC interaction indicator (Talk)
+            if (aimingAtNPC) {
+                wi::font::SetCanvas(*this);
+
+                float indicatorX = aimDotScreenPos.x + 20.0f; // 20px to the right of aim dot
+                float indicatorY = aimDotScreenPos.y;
+
+                // Black filled circle background
+                {
+                    wi::image::Params params;
+                    float circleSize = 24.0f;
+                    params.pos =
+                        XMFLOAT3(indicatorX - circleSize * 0.5f, indicatorY - circleSize * 0.5f, 0);
+                    params.siz = XMFLOAT2(circleSize, circleSize);
+                    params.pivot = XMFLOAT2(0, 0);
+                    params.color = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.9f); // Black, 90% opacity
+                    params.blendFlag = wi::enums::BLENDMODE_ALPHA;
+                    params.enableCornerRounding();
+                    float radius = circleSize * 0.5f;
+                    params.corners_rounding[0] = {radius, 12};
+                    params.corners_rounding[1] = {radius, 12};
+                    params.corners_rounding[2] = {radius, 12};
+                    params.corners_rounding[3] = {radius, 12};
+                    wi::image::Draw(nullptr, params, cmd);
+                }
+
+                // White "T" letter inside circle
+                {
+                    wi::font::Params params;
+                    params.posX = indicatorX;
+                    params.posY = indicatorY;
+                    params.size = 16;
+                    params.h_align = wi::font::WIFALIGN_CENTER;
+                    params.v_align = wi::font::WIFALIGN_CENTER;
+                    params.color = wi::Color::White();
+                    wi::font::Draw("T", params, cmd);
+                }
+
+                // "Talk" text beside the circle
+                {
+                    wi::font::Params params;
+                    params.posX = indicatorX + 18.0f; // Right of circle
+                    params.posY = indicatorY;
+                    params.size = 14;
+                    params.h_align = wi::font::WIFALIGN_LEFT;
+                    params.v_align = wi::font::WIFALIGN_CENTER;
+                    params.color = wi::Color::White();
+                    params.shadowColor = wi::Color(0, 0, 0, 200);
+                    wi::font::Draw("Talk", params, cmd);
+                }
             }
         }
 
