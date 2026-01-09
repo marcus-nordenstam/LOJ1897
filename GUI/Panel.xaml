@@ -78,7 +78,7 @@
     <Grid x:Name="MenuContainer">
         <!-- Background with MainMenu.png -->
         <Grid.Background>
-            <ImageBrush ImageSource="MainMenu.png" Stretch="UniformToFill"/>
+            <ImageBrush ImageSource="GUI/MainMenu.png" Stretch="UniformToFill"/>
         </Grid.Background>
 
         <!-- Main Menu Content - Positioned on the right side -->
@@ -246,7 +246,7 @@
             <Rectangle Canvas.Left="-10000" Canvas.Top="-10000" 
                        Width="25000" Height="25000">
                 <Rectangle.Fill>
-                    <ImageBrush ImageSource="CaseboardBackground.png" 
+                    <ImageBrush ImageSource="GUI/CaseboardBackground.png"
                                 TileMode="Tile"
                                 Viewport="0,0,438,358"
                                 ViewportUnits="Absolute"
@@ -262,7 +262,7 @@
             
                 <!-- Case Card: VICTIM -->
                 <Image x:Name="CaseCard_Victim"
-                       Source="Cards/ACC_CARD_VICTIM.png"
+                       Source="GUI/Cards/ACC_CARD_VICTIM.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -272,7 +272,7 @@
                 
                 <!-- Case Card: CAUSE OF DEATH -->
                 <Image x:Name="CaseCard_CauseOfDeath"
-                       Source="Cards/ACC_CARD_CAUSE OF DEATH.png"
+                       Source="GUI/Cards/ACC_CARD_CAUSE OF DEATH.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -282,7 +282,7 @@
                 
                 <!-- Case Card: TIME AND PLACE -->
                 <Image x:Name="CaseCard_TimePlace"
-                       Source="Cards/ACC_CARD_TIME AND PLACE.png"
+                       Source="GUI/Cards/ACC_CARD_TIME AND PLACE.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -292,7 +292,7 @@
                 
                 <!-- Case Card: MEANS -->
                 <Image x:Name="CaseCard_Means"
-                       Source="Cards/ACC_CARD_MEANS.png"
+                       Source="GUI/Cards/ACC_CARD_MEANS.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -302,7 +302,7 @@
                 
                 <!-- Case Card: MOTIVE -->
                 <Image x:Name="CaseCard_Motive"
-                       Source="Cards/ACC_CARD_MOTIVE.png"
+                       Source="GUI/Cards/ACC_CARD_MOTIVE.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -312,7 +312,7 @@
                 
                 <!-- Case Card: SUSPECT -->
                 <Image x:Name="CaseCard_Suspect"
-                       Source="Cards/ACC_CARD SUSPECT.png"
+                       Source="GUI/Cards/ACC_CARD SUSPECT.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>

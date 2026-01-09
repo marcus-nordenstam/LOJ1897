@@ -317,12 +317,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Capture the current frame to memory (before shutter obscures it)
     void CaptureFrameToMemory();
 
-    // Called when shutter animation reaches fully closed state (photo captured)
-    void OnPhotoCaptured();
-
-    // Process the pending photo (apply effects) and create a caseboard card
-    void ProcessAndCreatePhotoCard();
-
     // Apply sepia filter to pixel data (RGBA format)
     void ApplySepia(std::vector<uint8_t> &pixels, int width, int height);
 

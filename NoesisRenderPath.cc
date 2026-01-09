@@ -39,9 +39,9 @@ void NoesisRenderPath::EnterDialogueMode(wi::ecs::Entity npcEntity) {
 
     // Clear previous dialogue and add initial greeting
     ClearDialogue();
-    AddDialogueEntry("Dr Robban", "Good day. How may I help you?");
+    AddDialogueEntry("Dr Rabban", "Good day. How may I help you?");
     AddDialogueEntry("You", "Wohoo this is working");
-    AddDialogueEntry("Dr Robban", "We're not out of the woods just yet");
+    AddDialogueEntry("Dr Rabban", "We're not out of the woods just yet");
 
     // Focus the input box
     if (dialogueInput && uiView) {
@@ -491,7 +491,7 @@ void NoesisRenderPath::AddNoteCard() {
     // Create and set up the background image
     Noesis::Ptr<Noesis::Image> bgImage = *new Noesis::Image();
     Noesis::Ptr<Noesis::BitmapImage> bitmapSource = *new Noesis::BitmapImage();
-    bitmapSource->SetUriSource(Noesis::Uri("Cards/Note_Card.png"));
+    bitmapSource->SetUriSource(Noesis::Uri("GUI/Cards/Note_Card.png"));
     bgImage->SetSource(bitmapSource);
     bgImage->SetStretch(Noesis::Stretch_Fill);
     noteContainer->GetChildren()->Add(bgImage);
@@ -819,12 +819,12 @@ void NoesisRenderPath::CaptureFrameToMemory() {
     int origHeight = desc.height;
 
     // Use Wicked's built-in screenshot to save directly to PNG (handles format conversion)
-    CreateDirectoryA("GUI", NULL);
-    CreateDirectoryA("GUI/Photos", NULL);
+    CreateDirectoryA("SavedGameData", NULL);
+    CreateDirectoryA("SavedGameData/Photos", NULL);
 
     // This will be the final photo file (incremented in OnPhotoCaptured, so use +1 here)
     int photoNum = photosTaken + 1;
-    pendingPhotoFilename = "GUI/Photos/photo_" + std::to_string(photoNum) + ".png";
+    pendingPhotoFilename = "SavedGameData/Photos/photo_" + std::to_string(photoNum) + ".png";
 
     // saveTextureToFile handles all format conversions internally
     if (!wi::helper::saveTextureToFile(renderResult, pendingPhotoFilename)) {
@@ -867,38 +867,8 @@ void NoesisRenderPath::CaptureFrameToMemory() {
 
     hasPendingPhoto = true;
 
-    char buf[128];
-    sprintf_s(buf, "Photo captured: %dx%d crop from %dx%d frame\n", cropWidth, cropHeight,
-              loadedWidth, loadedHeight);
-    wi::backlog::post(buf);
-
-    OnPhotoCaptured();
-}
-
-// Called when shutter animation reaches fully closed state (photo captured)
-void NoesisRenderPath::OnPhotoCaptured() {
-    if (!hasPendingPhoto) {
-        wi::backlog::post("OnPhotoCaptured: No pending photo to process!\n");
-        return;
-    }
-
     photosTaken++;
     UpdateCameraPhotoCount();
-
-    char buf[128];
-    sprintf_s(buf, "Photo captured! Processing photo #%d...\n", photosTaken);
-    wi::backlog::post(buf);
-
-    // Process the pending photo and create a card
-    ProcessAndCreatePhotoCard();
-}
-
-// Process the pending photo (apply effects) and create a caseboard card
-void NoesisRenderPath::ProcessAndCreatePhotoCard() {
-    if (!hasPendingPhoto || pendingPhotoPixels.empty() || pendingPhotoFilename.empty()) {
-        wi::backlog::post("ProcessAndCreatePhotoCard: No pending photo!\n");
-        return;
-    }
 
     // Apply vintage photo effects to the captured pixels
     ApplySepia(pendingPhotoPixels, pendingPhotoWidth, pendingPhotoHeight);
@@ -911,11 +881,6 @@ void NoesisRenderPath::ProcessAndCreatePhotoCard() {
         hasPendingPhoto = false;
         return;
     }
-
-    char buf[256];
-    sprintf_s(buf, "Photo processed and saved: %s\n", pendingPhotoFilename.c_str());
-    wi::backlog::post(buf);
-
     // Create the photo card in caseboard
     AddPhotoCard(pendingPhotoFilename);
 
@@ -925,6 +890,26 @@ void NoesisRenderPath::ProcessAndCreatePhotoCard() {
     pendingPhotoWidth = 0;
     pendingPhotoHeight = 0;
     pendingPhotoFilename.clear();
+}
+
+// Save processed photo pixels to a PNG file, returns the filename
+// Save processed pixels to a PNG file
+bool NoesisRenderPath::SaveProcessedPhoto(const std::string &filename,
+                                          const std::vector<uint8_t> &pixels, int width,
+                                          int height) {
+    // Create texture desc for the processed image
+    wi::graphics::TextureDesc photoDesc;
+    photoDesc.width = width;
+    photoDesc.height = height;
+    photoDesc.format = wi::graphics::Format::R8G8B8A8_UNORM;
+    photoDesc.mip_levels = 1;
+    photoDesc.array_size = 1;
+
+    // Convert std::vector to wi::vector for compatibility
+    wi::vector<uint8_t> wiPixels(pixels.begin(), pixels.end());
+
+    // Save to file using Wicked Engine's helper (overwrites existing file)
+    return wi::helper::saveTextureToFile(wiPixels, photoDesc, filename);
 }
 
 // Apply sepia filter to pixel data (RGBA format)
@@ -1000,26 +985,6 @@ void NoesisRenderPath::AddFilmGrain(std::vector<uint8_t> &pixels, int width, int
     }
 }
 
-// Save processed photo pixels to a PNG file, returns the filename
-// Save processed pixels to a PNG file
-bool NoesisRenderPath::SaveProcessedPhoto(const std::string &filename,
-                                          const std::vector<uint8_t> &pixels, int width,
-                                          int height) {
-    // Create texture desc for the processed image
-    wi::graphics::TextureDesc photoDesc;
-    photoDesc.width = width;
-    photoDesc.height = height;
-    photoDesc.format = wi::graphics::Format::R8G8B8A8_UNORM;
-    photoDesc.mip_levels = 1;
-    photoDesc.array_size = 1;
-
-    // Convert std::vector to wi::vector for compatibility
-    wi::vector<uint8_t> wiPixels(pixels.begin(), pixels.end());
-
-    // Save to file using Wicked Engine's helper (overwrites existing file)
-    return wi::helper::saveTextureToFile(wiPixels, photoDesc, filename);
-}
-
 // Add a photo card to the caseboard with the image from file
 void NoesisRenderPath::AddPhotoCard(const std::string &photoFilename) {
     if (!caseboardContent) {
@@ -1054,12 +1019,8 @@ void NoesisRenderPath::AddPhotoCard(const std::string &photoFilename) {
     Noesis::Ptr<Noesis::Image> photoImage = *new Noesis::Image();
     Noesis::Ptr<Noesis::BitmapImage> bitmapSource = *new Noesis::BitmapImage();
 
-    // Convert path: "GUI/Photos/photo_1.png" -> "Photos/photo_1.png" (relative to GUI folder)
-    std::string relativePath = photoFilename;
-    if (relativePath.substr(0, 4) == "GUI/") {
-        relativePath = relativePath.substr(4);
-    }
-    bitmapSource->SetUriSource(Noesis::Uri(relativePath.c_str()));
+    // Use the full path as-is (SavedGameData is relative to executable)
+    bitmapSource->SetUriSource(Noesis::Uri(photoFilename.c_str()));
     photoImage->SetSource(bitmapSource);
     photoImage->SetStretch(Noesis::Stretch_Uniform);
     photoImage->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
@@ -1115,11 +1076,6 @@ void NoesisRenderPath::AddPhotoCard(const std::string &photoFilename) {
     card.boardY = boardY;
     card.labelText = labelText;
     photoCards.push_back(card);
-
-    char buf[128];
-    sprintf_s(buf, "AddPhotoCard: Photo card #%d created at (%.0f, %.0f)\n", photosTaken, boardX,
-              boardY);
-    wi::backlog::post(buf);
 }
 
 // Simulate shutter animation (call from Update)
@@ -2482,7 +2438,7 @@ void NoesisRenderPath::InitializeNoesis() {
     Noesis::GUI::Init();
 
     // Set texture provider to load images from GUI folder
-    Noesis::GUI::SetTextureProvider(Noesis::MakePtr<NoesisApp::LocalTextureProvider>("./GUI"));
+    Noesis::GUI::SetTextureProvider(Noesis::MakePtr<NoesisApp::LocalTextureProvider>("."));
 
     Noesis::GUI::SetXamlProvider(Noesis::MakePtr<NoesisApp::LocalXamlProvider>("./GUI"));
 
