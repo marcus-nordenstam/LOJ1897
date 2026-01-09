@@ -231,19 +231,8 @@
           Visibility="Collapsed"
           ClipToBounds="True">
         
-        <!-- Dark fabric background (fixed, doesn't pan/zoom) -->
-        <Border Background="#FF0A1520"/>
-        
-        <!-- Fabric texture overlay (subtle pattern, fixed) -->
-        <Border>
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#FF0A1822" Offset="0"/>
-                    <GradientStop Color="#FF0D1E2A" Offset="0.5"/>
-                    <GradientStop Color="#FF081418" Offset="1"/>
-                </LinearGradientBrush>
-            </Border.Background>
-        </Border>
+        <!-- Caseboard background image (fixed, doesn't pan/zoom) -->
+        <Image Source="CaseboardBackground.png" Stretch="UniformToFill"/>
         
         <!-- Pannable/Zoomable Content Container -->
         <Canvas x:Name="CaseboardContent" ClipToBounds="False">
@@ -254,139 +243,71 @@
                     <TranslateTransform x:Name="CaseboardPanTransform" X="0" Y="0"/>
                 </TransformGroup>
             </Canvas.RenderTransform>
-            
-            <!-- Title (positioned in board space) -->
-            <TextBlock Canvas.Left="700" Canvas.Top="200"
-                       Text="MURDER CARDS"
-                       FontSize="42"
-                       FontWeight="Bold"
-                       Foreground="#FF4A2020"
-                       FontFamily="Theme/Fonts/#PT Root UI">
-                <TextBlock.Effect>
-                    <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="3" Opacity="0.5"/>
-                </TextBlock.Effect>
-            </TextBlock>
         
             <!-- Case Cards Container (positioned in board space) -->
             <StackPanel x:Name="CaseCardsContainer"
                         Canvas.Left="200" Canvas.Top="300"
                         Orientation="Horizontal">
             
-            <!-- Case Card: VICTIM -->
-            <Border x:Name="CaseCard_Victim"
-                    Width="180" Height="240"
-                    Margin="15"
-                    Background="#FF1A1A1A"
-                    BorderBrush="#FF333333"
-                    BorderThickness="2"
-                    CornerRadius="4">
-                <Grid>
-                    <TextBlock Text="VICTIM"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#FF666666"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontFamily="Theme/Fonts/#PT Root UI"/>
-                </Grid>
-            </Border>
-            
-            <!-- Case Card: CAUSE OF DEATH -->
-            <Border x:Name="CaseCard_CauseOfDeath"
-                    Width="180" Height="240"
-                    Margin="15"
-                    Background="#FF1A1A1A"
-                    BorderBrush="#FF333333"
-                    BorderThickness="2"
-                    CornerRadius="4">
-                <Grid>
-                    <TextBlock Text="CAUSE OF&#x0a;DEATH"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#FF666666"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               TextAlignment="Center"
-                               FontFamily="Theme/Fonts/#PT Root UI"/>
-                </Grid>
-            </Border>
-            
-            <!-- Case Card: TIME & PLACE -->
-            <Border x:Name="CaseCard_TimePlace"
-                    Width="180" Height="240"
-                    Margin="15"
-                    Background="#FF1A1A1A"
-                    BorderBrush="#FF333333"
-                    BorderThickness="2"
-                    CornerRadius="4">
-                <Grid>
-                    <TextBlock Text="TIME &amp;&#x0a;PLACE"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#FF666666"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               TextAlignment="Center"
-                               FontFamily="Theme/Fonts/#PT Root UI"/>
-                </Grid>
-            </Border>
-            
-            <!-- Case Card: MEANS -->
-            <Border x:Name="CaseCard_Means"
-                    Width="180" Height="240"
-                    Margin="15"
-                    Background="#FF1A1A1A"
-                    BorderBrush="#FF333333"
-                    BorderThickness="2"
-                    CornerRadius="4">
-                <Grid>
-                    <TextBlock Text="MEANS"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#FF666666"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontFamily="Theme/Fonts/#PT Root UI"/>
-                </Grid>
-            </Border>
-            
-            <!-- Case Card: MOTIVE -->
-            <Border x:Name="CaseCard_Motive"
-                    Width="180" Height="240"
-                    Margin="15"
-                    Background="#FF1A1A1A"
-                    BorderBrush="#FF333333"
-                    BorderThickness="2"
-                    CornerRadius="4">
-                <Grid>
-                    <TextBlock Text="MOTIVE"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#FF666666"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontFamily="Theme/Fonts/#PT Root UI"/>
-                </Grid>
-            </Border>
-            
-            <!-- Case Card: SUSPECT -->
-            <Border x:Name="CaseCard_Suspect"
-                    Width="180" Height="240"
-                    Margin="15"
-                    Background="#FF1A1A1A"
-                    BorderBrush="#FF333333"
-                    BorderThickness="2"
-                    CornerRadius="4">
-                <Grid>
-                    <TextBlock Text="SUSPECT"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#FF666666"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontFamily="Theme/Fonts/#PT Root UI"/>
-                </Grid>
-            </Border>
+                <!-- Case Card: VICTIM -->
+                <Image x:Name="CaseCard_Victim"
+                       Source="Cards/ACC_CARD_VICTIM.png"
+                       Width="180"
+                       Margin="15">
+                    <Image.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="5" Opacity="0.6"/>
+                    </Image.Effect>
+                </Image>
+                
+                <!-- Case Card: CAUSE OF DEATH -->
+                <Image x:Name="CaseCard_CauseOfDeath"
+                       Source="Cards/ACC_CARD_CAUSE OF DEATH.png"
+                       Width="180"
+                       Margin="15">
+                    <Image.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="5" Opacity="0.6"/>
+                    </Image.Effect>
+                </Image>
+                
+                <!-- Case Card: TIME AND PLACE -->
+                <Image x:Name="CaseCard_TimePlace"
+                       Source="Cards/ACC_CARD_TIME AND PLACE.png"
+                       Width="180"
+                       Margin="15">
+                    <Image.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="5" Opacity="0.6"/>
+                    </Image.Effect>
+                </Image>
+                
+                <!-- Case Card: MEANS -->
+                <Image x:Name="CaseCard_Means"
+                       Source="Cards/ACC_CARD_MEANS.png"
+                       Width="180"
+                       Margin="15">
+                    <Image.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="5" Opacity="0.6"/>
+                    </Image.Effect>
+                </Image>
+                
+                <!-- Case Card: MOTIVE -->
+                <Image x:Name="CaseCard_Motive"
+                       Source="Cards/ACC_CARD_MOTIVE.png"
+                       Width="180"
+                       Margin="15">
+                    <Image.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="5" Opacity="0.6"/>
+                    </Image.Effect>
+                </Image>
+                
+                <!-- Case Card: SUSPECT -->
+                <Image x:Name="CaseCard_Suspect"
+                       Source="Cards/ACC_CARD SUSPECT.png"
+                       Width="180"
+                       Margin="15">
+                    <Image.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="5" Opacity="0.6"/>
+                    </Image.Effect>
+                </Image>
             
             </StackPanel>
         </Canvas>

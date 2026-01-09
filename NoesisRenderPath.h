@@ -119,6 +119,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     
     // Caseboard mode state
     bool inCaseboardMode = false;
+    bool caseboardJustEntered = false;  // Flag to skip first frame after entering
     
     // Caseboard pan/zoom state
     float caseboardZoom = 1.0f;
@@ -327,6 +328,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
             return;
         
         inCaseboardMode = true;
+        caseboardJustEntered = true;  // Skip first frame to avoid immediate exit
         caseboardPanning = false;
         
         // Reset pan/zoom to default (centered view)
@@ -1259,6 +1261,12 @@ class NoesisRenderPath : public wi::RenderPath3D {
         // Handle caseboard mode input
         if (inCaseboardMode) {
             // Escape or C key - exit caseboard mode
+            // Skip first frame after entering to avoid immediate exit when C is still held
+            if (caseboardJustEntered) {
+                caseboardJustEntered = false;
+                return;
+            }
+            
             static bool escWasPressedCaseboard = false;
             static bool cWasPressedCaseboard = false;
             bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
