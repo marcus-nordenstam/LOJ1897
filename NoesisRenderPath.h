@@ -39,6 +39,10 @@
 #include <NsGui/UIElementCollection.h>
 #include <NsGui/Uri.h>
 #include <NsGui/UserControl.h>
+#include <NsGui/Image.h>
+#include <NsGui/Canvas.h>
+#include <NsGui/BitmapImage.h>
+#include <NsGui/Panel.h>
 #include <NsRender/D3D12Factory.h>
 #include <NsRender/RenderDevice.h>
 
@@ -69,9 +73,23 @@ class NoesisRenderPath : public wi::RenderPath3D {
     
     // Caseboard panel elements
     Noesis::Ptr<Noesis::Grid> caseboardPanel;               // Main caseboard container
+    Noesis::Ptr<Noesis::Panel> caseboardContent;            // Pannable content canvas
     Noesis::ScaleTransform* caseboardZoomTransform = nullptr;      // Zoom transform (owned by TransformGroup)
     Noesis::TranslateTransform* caseboardPanTransform = nullptr;   // Pan transform (owned by TransformGroup)
     Noesis::Ptr<Noesis::TextBlock> caseboardDebugText;             // Debug text overlay
+    
+    // Note cards
+    struct NoteCard {
+        Noesis::Ptr<Noesis::Grid> container;  // The note card container
+        Noesis::Ptr<Noesis::TextBox> textBox; // Editable text (when editing)
+        Noesis::Ptr<Noesis::TextBlock> textLabel; // Display text (when not editing)
+        float boardX = 0.0f;                   // Position in board space
+        float boardY = 0.0f;
+        bool isEditing = false;               // Currently being edited
+        std::string savedText;                // The saved note text
+    };
+    std::vector<NoteCard> noteCards;
+    int editingNoteCardIndex = -1;            // Index of note card being edited, -1 if none
 
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
@@ -401,6 +419,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
         if (!inCaseboardMode)
             return;
         
+        // Finalize any note card being edited
+        if (editingNoteCardIndex >= 0) {
+            FinalizeNoteCardEdit();
+        }
+        
         inCaseboardMode = false;
         caseboardPanning = false;
         
@@ -482,6 +505,28 @@ class NoesisRenderPath : public wi::RenderPath3D {
         if (!inCaseboardMode)
             return;
         
+        // If we're editing a note and click elsewhere, finalize the edit
+        if (editingNoteCardIndex >= 0 && editingNoteCardIndex < (int)noteCards.size()) {
+            NoteCard& card = noteCards[editingNoteCardIndex];
+            
+            // Convert click position to board space
+            float boardClickX = (x - caseboardPanX) / caseboardZoom;
+            float boardClickY = (y - caseboardPanY) / caseboardZoom;
+            
+            // Check if click is outside the note card (with some padding)
+            float cardLeft = card.boardX - 90.0f;
+            float cardTop = card.boardY - 110.0f;
+            float cardRight = cardLeft + 180.0f;
+            float cardBottom = cardTop + 220.0f;
+            
+            bool clickedOutside = (boardClickX < cardLeft || boardClickX > cardRight ||
+                                   boardClickY < cardTop || boardClickY > cardBottom);
+            
+            if (clickedOutside) {
+                FinalizeNoteCardEdit();
+            }
+        }
+        
         caseboardPanning = true;
         caseboardLastMousePos.x = x;
         caseboardLastMousePos.y = y;
@@ -553,6 +598,144 @@ class NoesisRenderPath : public wi::RenderPath3D {
         } else {
             // Just update debug text when not panning
             UpdateCaseboardDebugText();
+        }
+    }
+    
+    // Add a note card at the center of the current view
+    void AddNoteCard() {
+        if (!inCaseboardMode || !caseboardContent)
+            return;
+        
+        // Get the center of the current view in board space
+        RECT clientRect;
+        GetClientRect(windowHandle, &clientRect);
+        float viewCenterX = (float)(clientRect.right - clientRect.left) / 2.0f;
+        float viewCenterY = (float)(clientRect.bottom - clientRect.top) / 2.0f;
+        
+        // Convert to board space
+        float boardX = (viewCenterX - caseboardPanX) / caseboardZoom;
+        float boardY = (viewCenterY - caseboardPanY) / caseboardZoom;
+        
+        // Create the note card container (Grid with Image background and TextBox)
+        Noesis::Ptr<Noesis::Grid> noteContainer = *new Noesis::Grid();
+        noteContainer->SetWidth(180.0f);
+        noteContainer->SetHeight(220.0f);
+        
+        // Create and set up the background image
+        Noesis::Ptr<Noesis::Image> bgImage = *new Noesis::Image();
+        Noesis::Ptr<Noesis::BitmapImage> bitmapSource = *new Noesis::BitmapImage();
+        bitmapSource->SetUriSource(Noesis::Uri("Cards/Note_Card.png"));
+        bgImage->SetSource(bitmapSource);
+        bgImage->SetStretch(Noesis::Stretch_Fill);
+        noteContainer->GetChildren()->Add(bgImage);
+        
+        // Create the text box for note input
+        Noesis::Ptr<Noesis::TextBox> textBox = *new Noesis::TextBox();
+        textBox->SetText("");
+        textBox->SetTextWrapping(Noesis::TextWrapping_Wrap);
+        textBox->SetAcceptsReturn(true);
+        textBox->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
+        textBox->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
+        textBox->SetMargin(Noesis::Thickness(15.0f, 40.0f, 15.0f, 20.0f));  // Padding for note paper lines
+        textBox->SetFontSize(14.0f);
+        textBox->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI"));
+        
+        // Dark blue ink color for note text
+        Noesis::Ptr<Noesis::SolidColorBrush> inkBrush = Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C));
+        textBox->SetForeground(inkBrush);
+        textBox->SetBackground(nullptr);  // Transparent background
+        textBox->SetBorderThickness(Noesis::Thickness(0.0f));  // No border
+        textBox->SetCaretBrush(inkBrush);
+        noteContainer->GetChildren()->Add(textBox);
+        
+        // Position the note card on the canvas
+        Noesis::Canvas::SetLeft(noteContainer, boardX - 90.0f);  // Center horizontally
+        Noesis::Canvas::SetTop(noteContainer, boardY - 110.0f);  // Center vertically
+        
+        // Add to the caseboard content
+        Noesis::UIElementCollection* children = caseboardContent->GetChildren();
+        if (children) {
+            children->Add(noteContainer);
+        }
+        
+        // Store reference
+        NoteCard card;
+        card.container = noteContainer;
+        card.textBox = textBox;
+        card.textLabel = nullptr;  // Will be created when editing is finalized
+        card.boardX = boardX;
+        card.boardY = boardY;
+        card.isEditing = true;
+        card.savedText = "";
+        noteCards.push_back(card);
+        
+        // Track which note card is being edited
+        editingNoteCardIndex = (int)noteCards.size() - 1;
+        
+        // Focus the text box for immediate typing
+        textBox->Focus();
+        
+        char buf[128];
+        sprintf_s(buf, "Added note card at board position (%.0f, %.0f)\n", boardX, boardY);
+        OutputDebugStringA(buf);
+    }
+    
+    // Finalize note card editing - save text and replace TextBox with TextBlock
+    void FinalizeNoteCardEdit() {
+        if (editingNoteCardIndex < 0 || editingNoteCardIndex >= (int)noteCards.size())
+            return;
+        
+        NoteCard& card = noteCards[editingNoteCardIndex];
+        if (!card.isEditing || !card.textBox)
+            return;
+        
+        // Get the text from the TextBox
+        const char* text = card.textBox->GetText();
+        card.savedText = text ? text : "";
+        
+        // Remove the TextBox from the container
+        Noesis::UIElementCollection* children = card.container->GetChildren();
+        if (children) {
+            children->Remove(card.textBox.GetPtr());
+        }
+        
+        // Create a TextBlock to display the saved text
+        Noesis::Ptr<Noesis::TextBlock> textLabel = *new Noesis::TextBlock();
+        textLabel->SetText(card.savedText.c_str());
+        textLabel->SetTextWrapping(Noesis::TextWrapping_Wrap);
+        textLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
+        textLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Left);
+        textLabel->SetMargin(Noesis::Thickness(15.0f, 40.0f, 15.0f, 20.0f));
+        textLabel->SetFontSize(14.0f);
+        textLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI"));
+        textLabel->SetFontWeight(Noesis::FontWeight_Normal);
+        
+        // Dark blue ink color
+        Noesis::Ptr<Noesis::SolidColorBrush> inkBrush = Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C));
+        textLabel->SetForeground(inkBrush);
+        
+        // Override the global TextBlock style effects
+        textLabel->SetEffect(nullptr);
+        
+        // Add the TextBlock to the container
+        if (children) {
+            children->Add(textLabel);
+        }
+        
+        // Update the note card state
+        card.textLabel = textLabel;
+        card.textBox.Reset();  // Release the TextBox
+        card.isEditing = false;
+        
+        editingNoteCardIndex = -1;
+        
+        OutputDebugStringA("Finalized note card edit\n");
+    }
+    
+    // Handle click on caseboard - finalize any active note edit
+    void OnCaseboardClick() {
+        if (editingNoteCardIndex >= 0) {
+            FinalizeNoteCardEdit();
         }
     }
 
@@ -1364,13 +1547,13 @@ class NoesisRenderPath : public wi::RenderPath3D {
         
         // Handle caseboard mode input
         if (inCaseboardMode) {
-            // Escape or C key - exit caseboard mode
             // Skip first frame after entering to avoid immediate exit when C is still held
             if (caseboardJustEntered) {
                 caseboardJustEntered = false;
                 return;
             }
             
+            // Escape or C key - exit caseboard mode
             static bool escWasPressedCaseboard = false;
             static bool cWasPressedCaseboard = false;
             bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
@@ -1380,6 +1563,14 @@ class NoesisRenderPath : public wi::RenderPath3D {
             }
             escWasPressedCaseboard = escPressed;
             cWasPressedCaseboard = cPressed;
+            
+            // N key - add a new note card
+            static bool nWasPressed = false;
+            bool nPressed = (GetAsyncKeyState('N') & 0x8000) != 0;
+            if (nPressed && !nWasPressed) {
+                AddNoteCard();
+            }
+            nWasPressed = nPressed;
 
             // Skip walkabout controls while in caseboard
             return;
@@ -1857,7 +2048,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
         caseboardDebugText = FindElementByName<Noesis::TextBlock>(rootGrid, "CaseboardDebugText");
         
         // Find the CaseboardContent canvas and get its transforms
-        Noesis::Ptr<Noesis::Panel> caseboardContent = FindElementByName<Noesis::Panel>(rootGrid, "CaseboardContent");
+        caseboardContent = FindElementByName<Noesis::Panel>(rootGrid, "CaseboardContent");
         if (caseboardContent) {
             Noesis::Transform* transform = caseboardContent->GetRenderTransform();
             if (transform) {
@@ -1980,9 +2171,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
         dialogueInput.Reset();
         dialogueHintText.Reset();
         caseboardPanel.Reset();
+        caseboardContent.Reset();
         caseboardDebugText.Reset();
         caseboardZoomTransform = nullptr;
         caseboardPanTransform = nullptr;
+        noteCards.clear();
         rootElement.Reset();
 
         if (frameFence) {

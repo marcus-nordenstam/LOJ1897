@@ -254,9 +254,10 @@
                 </Rectangle.Fill>
             </Rectangle>
         
-            <!-- Case Cards Container (positioned in board space) -->
+            <!-- Case Cards Container (centered on board origin) -->
+            <!-- 6 cards × (180px + 30px margin) = 1260px total width, so Left = -630 to center -->
             <StackPanel x:Name="CaseCardsContainer"
-                        Canvas.Left="200" Canvas.Top="300"
+                        Canvas.Left="-630" Canvas.Top="-125"
                         Orientation="Horizontal">
             
                 <!-- Case Card: VICTIM -->
