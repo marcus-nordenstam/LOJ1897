@@ -351,4 +351,97 @@
         
     </Grid>
 
+    <!-- Camera/Photography Panel (shown when P is pressed during gameplay) -->
+    <Grid x:Name="CameraPanel"
+          HorizontalAlignment="Stretch"
+          VerticalAlignment="Stretch"
+          Visibility="Collapsed">
+        
+        <!-- Viewfinder overlay frame -->
+        <Grid>
+            <!-- Darkened edges (vignette effect) -->
+            <Border BorderThickness="80" BorderBrush="#60000000"/>
+            
+            <!-- Viewfinder grid lines (rule of thirds) -->
+            <Canvas>
+                <!-- Vertical lines (1/3 and 2/3) -->
+                <Rectangle x:Name="ViewfinderVLine1" 
+                           Width="1" Fill="#40FFFFFF"
+                           Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"/>
+                <Rectangle x:Name="ViewfinderVLine2" 
+                           Width="1" Fill="#40FFFFFF"
+                           Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"/>
+                <!-- Horizontal lines (1/3 and 2/3) -->
+                <Rectangle x:Name="ViewfinderHLine1" 
+                           Height="1" Fill="#40FFFFFF"
+                           Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"/>
+                <Rectangle x:Name="ViewfinderHLine2" 
+                           Height="1" Fill="#40FFFFFF"
+                           Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"/>
+            </Canvas>
+            
+            <!-- Corner brackets (vintage camera viewfinder style) -->
+            <Canvas>
+                <!-- Top-Left corner -->
+                <Path Stroke="#CCFFFFFF" StrokeThickness="3" Data="M 100,60 L 60,60 L 60,100"/>
+                <!-- Top-Right corner -->
+                <Path x:Name="ViewfinderCornerTR" Stroke="#CCFFFFFF" StrokeThickness="3"/>
+                <!-- Bottom-Left corner -->
+                <Path x:Name="ViewfinderCornerBL" Stroke="#CCFFFFFF" StrokeThickness="3"/>
+                <!-- Bottom-Right corner -->
+                <Path x:Name="ViewfinderCornerBR" Stroke="#CCFFFFFF" StrokeThickness="3"/>
+            </Canvas>
+            
+            <!-- Center focus indicator (small cross) -->
+            <Canvas HorizontalAlignment="Center" VerticalAlignment="Center" Width="40" Height="40" Margin="-20,-20,0,0">
+                <Rectangle Canvas.Left="19" Canvas.Top="5" Width="2" Height="12" Fill="#AAFFFFFF"/>
+                <Rectangle Canvas.Left="19" Canvas.Top="23" Width="2" Height="12" Fill="#AAFFFFFF"/>
+                <Rectangle Canvas.Left="5" Canvas.Top="19" Width="12" Height="2" Fill="#AAFFFFFF"/>
+                <Rectangle Canvas.Left="23" Canvas.Top="19" Width="12" Height="2" Fill="#AAFFFFFF"/>
+                <Ellipse Canvas.Left="12" Canvas.Top="12" Width="16" Height="16" 
+                         Stroke="#80FFFFFF" StrokeThickness="1"/>
+            </Canvas>
+        </Grid>
+        
+        <!-- Shutter animation bars (top and bottom black rectangles) -->
+        <Rectangle x:Name="ShutterBarTop"
+                   Fill="Black"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Top"
+                   Height="0"/>
+        <Rectangle x:Name="ShutterBarBottom"
+                   Fill="Black"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Bottom"
+                   Height="0"/>
+        
+        <!-- HUD hint at bottom -->
+        <TextBlock Text="[P] Exit Camera    [Click/Space] Take Photo"
+                   FontSize="16"
+                   Foreground="#FFFFFF00"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,0,30"
+                   FontFamily="Verdana">
+            <TextBlock.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="2" Opacity="0.8"/>
+            </TextBlock.Effect>
+        </TextBlock>
+        
+        <!-- Photo counter/info (top-right) -->
+        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,20,20,0">
+            <TextBlock x:Name="CameraPhotoCount"
+                       Text="PHOTOS: 0"
+                       FontSize="14"
+                       FontWeight="Normal"
+                       Foreground="#FFFFCC00"
+                       FontFamily="Consolas">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
+                </TextBlock.Effect>
+            </TextBlock>
+        </StackPanel>
+        
+    </Grid>
+
 </Grid>

@@ -229,16 +229,21 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
             break;
         case WM_LBUTTONDOWN:
-            // Forward mouse to Noesis when menu is visible, dialogue, or caseboard mode
+            // Forward mouse to Noesis when menu is visible, dialogue, caseboard, or camera mode
             if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() &&
                 (g_noesisRenderPath->IsMenuVisible() ||
                  g_noesisRenderPath->IsDialogueModeActive() ||
-                 g_noesisRenderPath->IsCaseboardModeActive())) {
+                 g_noesisRenderPath->IsCaseboardModeActive() ||
+                 g_noesisRenderPath->IsCameraModeActive())) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
 
+                // Handle camera click (takes photo)
+                if (g_noesisRenderPath->IsCameraModeActive()) {
+                    g_noesisRenderPath->CameraClick(x, y);
+                }
                 // Handle caseboard panning
-                if (g_noesisRenderPath->IsCaseboardModeActive()) {
+                else if (g_noesisRenderPath->IsCaseboardModeActive()) {
                     g_noesisRenderPath->CaseboardPanStart(x, y);
                 }
 
