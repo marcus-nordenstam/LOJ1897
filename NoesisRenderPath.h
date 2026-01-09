@@ -71,6 +71,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     Noesis::Ptr<Noesis::Grid> caseboardPanel;               // Main caseboard container
     Noesis::ScaleTransform* caseboardZoomTransform = nullptr;      // Zoom transform (owned by TransformGroup)
     Noesis::TranslateTransform* caseboardPanTransform = nullptr;   // Pan transform (owned by TransformGroup)
+    Noesis::Ptr<Noesis::TextBlock> caseboardDebugText;             // Debug text overlay
 
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
@@ -127,6 +128,12 @@ class NoesisRenderPath : public wi::RenderPath3D {
     float caseboardPanY = 0.0f;
     bool caseboardPanning = false;
     POINT caseboardLastMousePos = {};
+    POINT caseboardCurrentMousePos = {};  // Current mouse position (screen space)
+    
+    // Caseboard visible/pannable area (symmetric around origin)
+    // This defines the area accessible via panning at any zoom level
+    float caseboardVisibleHalfX = 3000.0f;  // Can pan to see -3000 to +3000 horizontally
+    float caseboardVisibleHalfY = 3000.0f;  // Adjusted for aspect ratio on enter
 
     // Fullscreen state
     HWND windowHandle = nullptr;
@@ -331,10 +338,43 @@ class NoesisRenderPath : public wi::RenderPath3D {
         caseboardJustEntered = true;  // Skip first frame to avoid immediate exit
         caseboardPanning = false;
         
-        // Reset pan/zoom to default (centered view)
+        // Calculate visible area dimensions based on window aspect ratio
+        if (windowHandle) {
+            RECT clientRect;
+            GetClientRect(windowHandle, &clientRect);
+            float viewportHoriz = (float)(clientRect.right - clientRect.left);
+            float viewportVert = (float)(clientRect.bottom - clientRect.top);
+            
+            // Set visible area: 3000 units in the smaller dimension, scaled for aspect ratio
+            // This ensures the visible area matches the window's aspect ratio
+            if (viewportHoriz > viewportVert) {
+                // Landscape: height is smaller
+                caseboardVisibleHalfY = 3000.0f;
+                caseboardVisibleHalfX = 3000.0f * (viewportHoriz / viewportVert);
+            } else {
+                // Portrait: width is smaller  
+                caseboardVisibleHalfX = 3000.0f;
+                caseboardVisibleHalfY = 3000.0f * (viewportVert / viewportHoriz);
+            }
+            
+            char buf[256];
+            sprintf_s(buf, "Caseboard visible area: %.0f x %.0f (half-extents)\n",
+                caseboardVisibleHalfX, caseboardVisibleHalfY);
+            OutputDebugStringA(buf);
+        }
+        
+        // Reset pan/zoom to default (origin centered on screen)
         caseboardZoom = 1.0f;
-        caseboardPanX = 0.0f;
-        caseboardPanY = 0.0f;
+        // Center origin on screen: pan = viewport / 2
+        if (windowHandle) {
+            RECT clientRect;
+            GetClientRect(windowHandle, &clientRect);
+            caseboardPanX = (float)(clientRect.right - clientRect.left) / 2.0f;
+            caseboardPanY = (float)(clientRect.bottom - clientRect.top) / 2.0f;
+        } else {
+            caseboardPanX = 0.0f;
+            caseboardPanY = 0.0f;
+        }
         UpdateCaseboardTransforms();
         
         // Show caseboard panel
@@ -385,6 +425,25 @@ class NoesisRenderPath : public wi::RenderPath3D {
             caseboardPanTransform->SetX(caseboardPanX);
             caseboardPanTransform->SetY(caseboardPanY);
         }
+        UpdateCaseboardDebugText();
+    }
+    
+    // Update caseboard debug text with current mouse position (board space) and zoom
+    void UpdateCaseboardDebugText() {
+        if (!caseboardDebugText)
+            return;
+        
+        // Convert screen mouse position to board space
+        // Board space = (screen - pan) / zoom
+        float boardX = (caseboardCurrentMousePos.x - caseboardPanX) / caseboardZoom;
+        float boardY = (caseboardCurrentMousePos.y - caseboardPanY) / caseboardZoom;
+        
+        // Format debug text showing position and visible area bounds
+        char debugStr[256];
+        snprintf(debugStr, sizeof(debugStr), 
+            "Board: (%.0f, %.0f)  Zoom: %.2fx  Visible: +/-%.0f x +/-%.0f", 
+            boardX, boardY, caseboardZoom, caseboardVisibleHalfX, caseboardVisibleHalfY);
+        caseboardDebugText->SetText(debugStr);
     }
     
     // Handle caseboard zoom (mouse wheel)
@@ -412,12 +471,10 @@ class NoesisRenderPath : public wi::RenderPath3D {
         caseboardPanX += (worldXAfter - worldXBefore) * caseboardZoom;
         caseboardPanY += (worldYAfter - worldYBefore) * caseboardZoom;
         
-        UpdateCaseboardTransforms();
+        // Clamp pan to board bounds after zoom
+        ClampCaseboardPan();
         
-        char buffer[128];
-        sprintf_s(buffer, "Caseboard zoom: %.2f, pan: (%.1f, %.1f)\n", 
-                  caseboardZoom, caseboardPanX, caseboardPanY);
-        OutputDebugStringA(buffer);
+        UpdateCaseboardTransforms();
     }
     
     // Handle caseboard pan start (mouse down)
@@ -436,20 +493,67 @@ class NoesisRenderPath : public wi::RenderPath3D {
     }
     
     // Handle caseboard pan move (mouse move while dragging)
-    void CaseboardPanMove(int x, int y) {
-        if (!inCaseboardMode || !caseboardPanning)
+    // Clamp pan values to keep board visible within viewport
+    void ClampCaseboardPan() {
+        if (!windowHandle)
             return;
         
-        float deltaX = (float)(x - caseboardLastMousePos.x);
-        float deltaY = (float)(y - caseboardLastMousePos.y);
+        RECT clientRect;
+        GetClientRect(windowHandle, &clientRect);
         
-        caseboardPanX += deltaX;
-        caseboardPanY += deltaY;
+        // Actual viewport dimensions
+        float viewportHoriz = (float)(clientRect.right - clientRect.left);
+        float viewportVert = (float)(clientRect.bottom - clientRect.top);
         
-        caseboardLastMousePos.x = x;
-        caseboardLastMousePos.y = y;
+        // Pan limits based on visible area (symmetric around origin: -halfX to +halfX)
+        // To see board position -halfX at screen left: 0 = -halfX * zoom + pan → pan = halfX * zoom
+        // To see board position +halfX at screen right: viewport = halfX * zoom + pan → pan = viewport - halfX * zoom
+        float maxPanX = caseboardVisibleHalfX * caseboardZoom;
+        float minPanX = viewportHoriz - caseboardVisibleHalfX * caseboardZoom;
         
-        UpdateCaseboardTransforms();
+        float maxPanY = caseboardVisibleHalfY * caseboardZoom;
+        float minPanY = viewportVert - caseboardVisibleHalfY * caseboardZoom;
+        
+        // If visible area is smaller than viewport at current zoom, center origin on screen
+        if (minPanX > maxPanX) {
+            caseboardPanX = viewportHoriz / 2.0f;
+        } else {
+            caseboardPanX = std::clamp(caseboardPanX, minPanX, maxPanX);
+        }
+        
+        if (minPanY > maxPanY) {
+            caseboardPanY = viewportVert / 2.0f;
+        } else {
+            caseboardPanY = std::clamp(caseboardPanY, minPanY, maxPanY);
+        }
+    }
+    
+    void CaseboardPanMove(int x, int y) {
+        if (!inCaseboardMode)
+            return;
+        
+        // Always update current mouse pos for debug display
+        caseboardCurrentMousePos.x = x;
+        caseboardCurrentMousePos.y = y;
+        
+        if (caseboardPanning) {
+            float deltaX = (float)(x - caseboardLastMousePos.x);
+            float deltaY = (float)(y - caseboardLastMousePos.y);
+            
+            caseboardPanX += deltaX;
+            caseboardPanY += deltaY;
+            
+            // Clamp pan to board bounds
+            ClampCaseboardPan();
+            
+            caseboardLastMousePos.x = x;
+            caseboardLastMousePos.y = y;
+            
+            UpdateCaseboardTransforms();
+        } else {
+            // Just update debug text when not panning
+            UpdateCaseboardDebugText();
+        }
     }
 
     // Config file management
@@ -1750,6 +1854,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
         
         // Find caseboard panel UI elements
         caseboardPanel = FindElementByName<Noesis::Grid>(rootGrid, "CaseboardPanel");
+        caseboardDebugText = FindElementByName<Noesis::TextBlock>(rootGrid, "CaseboardDebugText");
         
         // Find the CaseboardContent canvas and get its transforms
         Noesis::Ptr<Noesis::Panel> caseboardContent = FindElementByName<Noesis::Panel>(rootGrid, "CaseboardContent");
@@ -1875,6 +1980,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
         dialogueInput.Reset();
         dialogueHintText.Reset();
         caseboardPanel.Reset();
+        caseboardDebugText.Reset();
         caseboardZoomTransform = nullptr;
         caseboardPanTransform = nullptr;
         rootElement.Reset();

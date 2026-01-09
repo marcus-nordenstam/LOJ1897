@@ -242,8 +242,9 @@
             </Canvas.RenderTransform>
             
             <!-- Tiled background (moves with pan/zoom) -->
-            <Rectangle Canvas.Left="-2000" Canvas.Top="-2000" 
-                       Width="6000" Height="6000">
+            <!-- Size calculated for 0.2x min zoom: need ~5x viewport coverage in board space -->
+            <Rectangle Canvas.Left="-10000" Canvas.Top="-10000" 
+                       Width="25000" Height="25000">
                 <Rectangle.Fill>
                     <ImageBrush ImageSource="CaseboardBackground.png" 
                                 TileMode="Tile"
@@ -329,6 +330,23 @@
                    VerticalAlignment="Bottom"
                    Margin="0,0,0,30"
                    FontFamily="Verdana"/>
+        
+        <!-- Debug info (fixed, top-left corner) -->
+        <TextBlock x:Name="CaseboardDebugText"
+                   Text="Board: (0, 0)  Zoom: 1.00x"
+                   FontSize="14"
+                   FontWeight="Normal"
+                   Foreground="#FF00FF00"
+                   Background="#AA000000"
+                   HorizontalAlignment="Left"
+                   VerticalAlignment="Top"
+                   Margin="10,10,0,0"
+                   Padding="8,4"
+                   FontFamily="Consolas">
+            <TextBlock.Effect>
+                <DropShadowEffect ShadowDepth="0" BlurRadius="0"/>
+            </TextBlock.Effect>
+        </TextBlock>
         
     </Grid>
 
