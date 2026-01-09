@@ -91,7 +91,10 @@ class NoesisRenderPath : public wi::RenderPath3D {
         std::string savedText;  // The saved note text
     };
     std::vector<NoteCard> noteCards;
-    int editingNoteCardIndex = -1; // Index of note card being edited, -1 if none
+    int editingNoteCardIndex = -1;  // Index of note card being edited, -1 if none
+    int draggingNoteCardIndex = -1; // Index of note card being dragged, -1 if none
+    float dragOffsetX = 0.0f;       // Offset from card center to mouse when drag started
+    float dragOffsetY = 0.0f;
 
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
@@ -550,6 +553,13 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 }
             }
         }
+        
+        // Check if clicking on a note card's drag area (outside text area)
+        int dragCardIndex = HitTestNoteCardDragArea(boardClickX, boardClickY);
+        if (dragCardIndex >= 0) {
+            StartDraggingNoteCard(dragCardIndex, boardClickX, boardClickY);
+            return; // Don't start panning
+        }
 
         caseboardPanning = true;
         caseboardLastMousePos.x = x;
@@ -557,7 +567,10 @@ class NoesisRenderPath : public wi::RenderPath3D {
     }
 
     // Handle caseboard pan end (mouse up)
-    void CaseboardPanEnd() { caseboardPanning = false; }
+    void CaseboardPanEnd() { 
+        caseboardPanning = false;
+        StopDraggingNoteCard();
+    }
 
     // Handle caseboard pan move (mouse move while dragging)
     // Clamp pan values to keep board visible within viewport
@@ -603,6 +616,17 @@ class NoesisRenderPath : public wi::RenderPath3D {
         // Always update current mouse pos for debug display
         caseboardCurrentMousePos.x = x;
         caseboardCurrentMousePos.y = y;
+        
+        // Convert to board space for drag/hover detection
+        float boardX = (x - caseboardPanX) / caseboardZoom;
+        float boardY = (y - caseboardPanY) / caseboardZoom;
+        
+        // Handle note card dragging
+        if (IsDraggingNoteCard()) {
+            UpdateDraggingNoteCard(boardX, boardY);
+            UpdateCaseboardDebugText();
+            return;
+        }
 
         if (caseboardPanning) {
             float deltaX = (float)(x - caseboardLastMousePos.x);
@@ -619,6 +643,12 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
             UpdateCaseboardTransforms();
         } else {
+            // Check if hovering over a note card drag area for cursor change
+            int hoverCardIndex = HitTestNoteCardDragArea(boardX, boardY);
+            if (hoverCardIndex >= 0 && windowHandle) {
+                SetCursor(LoadCursor(NULL, IDC_HAND));
+            }
+            
             // Just update debug text when not panning
             UpdateCaseboardDebugText();
         }
@@ -815,6 +845,89 @@ class NoesisRenderPath : public wi::RenderPath3D {
         textBox->Focus();
 
         OutputDebugStringA("Started editing existing note card\n");
+    }
+    
+    // Check if a board position is on a note card's draggable area (not the text area)
+    // Returns the index of the note card, or -1 if not on any
+    int HitTestNoteCardDragArea(float boardX, float boardY) {
+        for (int i = (int)noteCards.size() - 1; i >= 0; i--) {  // Check top cards first
+            NoteCard& card = noteCards[i];
+            
+            // Full card bounds
+            float cardLeft = card.boardX - 90.0f;
+            float cardTop = card.boardY - 110.0f;
+            float cardRight = cardLeft + 180.0f;
+            float cardBottom = cardTop + 220.0f;
+            
+            // Text/editable area bounds
+            float textLeft = cardLeft + 15.0f;
+            float textTop = cardTop + 20.0f;
+            float textRight = cardRight - 15.0f;
+            float textBottom = cardBottom - 20.0f;
+            
+            // Check if inside card
+            if (boardX >= cardLeft && boardX <= cardRight &&
+                boardY >= cardTop && boardY <= cardBottom) {
+                // Check if NOT in text area (draggable area is outside text area)
+                bool inTextArea = (boardX >= textLeft && boardX <= textRight &&
+                                   boardY >= textTop && boardY <= textBottom);
+                if (!inTextArea) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+    
+    // Start dragging a note card
+    void StartDraggingNoteCard(int index, float boardX, float boardY) {
+        if (index < 0 || index >= (int)noteCards.size())
+            return;
+        
+        // If editing this card, finalize first
+        if (editingNoteCardIndex == index) {
+            FinalizeNoteCardEdit();
+        }
+        
+        draggingNoteCardIndex = index;
+        NoteCard& card = noteCards[index];
+        
+        // Store offset from card center to mouse position
+        dragOffsetX = boardX - card.boardX;
+        dragOffsetY = boardY - card.boardY;
+        
+        OutputDebugStringA("Started dragging note card\n");
+    }
+    
+    // Update dragged note card position
+    void UpdateDraggingNoteCard(float boardX, float boardY) {
+        if (draggingNoteCardIndex < 0 || draggingNoteCardIndex >= (int)noteCards.size())
+            return;
+        
+        NoteCard& card = noteCards[draggingNoteCardIndex];
+        
+        // Update position (accounting for drag offset)
+        card.boardX = boardX - dragOffsetX;
+        card.boardY = boardY - dragOffsetY;
+        
+        // Update the canvas position
+        if (card.container) {
+            Noesis::Canvas::SetLeft(card.container, card.boardX - 90.0f);
+            Noesis::Canvas::SetTop(card.container, card.boardY - 110.0f);
+        }
+    }
+    
+    // Stop dragging
+    void StopDraggingNoteCard() {
+        if (draggingNoteCardIndex >= 0) {
+            OutputDebugStringA("Stopped dragging note card\n");
+        }
+        draggingNoteCardIndex = -1;
+    }
+    
+    // Check if currently dragging a note card
+    bool IsDraggingNoteCard() const {
+        return draggingNoteCardIndex >= 0;
     }
 
     // Config file management
