@@ -16,33 +16,33 @@
 #include <NsCore/ReflectionImplement.h>
 #include <NsDrawing/Color.h>
 #include <NsDrawing/Thickness.h>
+#include <NsGui/BitmapImage.h>
 #include <NsGui/Border.h>
 #include <NsGui/Button.h>
+#include <NsGui/Canvas.h>
 #include <NsGui/Enums.h>
 #include <NsGui/FontFamily.h>
 #include <NsGui/FontProperties.h>
 #include <NsGui/Grid.h>
 #include <NsGui/IRenderer.h>
 #include <NsGui/IView.h>
+#include <NsGui/Image.h>
 #include <NsGui/InputEnums.h>
 #include <NsGui/IntegrationAPI.h>
+#include <NsGui/Panel.h>
 #include <NsGui/ScaleTransform.h>
 #include <NsGui/ScrollViewer.h>
 #include <NsGui/SolidColorBrush.h>
-#include <NsGui/TransformGroup.h>
-#include <NsGui/TranslateTransform.h>
 #include <NsGui/StackPanel.h>
 #include <NsGui/TextBlock.h>
 #include <NsGui/TextBox.h>
 #include <NsGui/TextProperties.h>
+#include <NsGui/TransformGroup.h>
+#include <NsGui/TranslateTransform.h>
 #include <NsGui/UIElement.h>
 #include <NsGui/UIElementCollection.h>
 #include <NsGui/Uri.h>
 #include <NsGui/UserControl.h>
-#include <NsGui/Image.h>
-#include <NsGui/Canvas.h>
-#include <NsGui/BitmapImage.h>
-#include <NsGui/Panel.h>
 #include <NsRender/D3D12Factory.h>
 #include <NsRender/RenderDevice.h>
 
@@ -70,26 +70,28 @@ class NoesisRenderPath : public wi::RenderPath3D {
     Noesis::Ptr<Noesis::StackPanel> dialogueList;           // Container for dialogue entries
     Noesis::Ptr<Noesis::TextBox> dialogueInput;             // Text input for player dialogue
     Noesis::Ptr<Noesis::TextBlock> dialogueHintText;        // Hint text for "[T] Take Testimony"
-    
+
     // Caseboard panel elements
-    Noesis::Ptr<Noesis::Grid> caseboardPanel;               // Main caseboard container
-    Noesis::Ptr<Noesis::Panel> caseboardContent;            // Pannable content canvas
-    Noesis::ScaleTransform* caseboardZoomTransform = nullptr;      // Zoom transform (owned by TransformGroup)
-    Noesis::TranslateTransform* caseboardPanTransform = nullptr;   // Pan transform (owned by TransformGroup)
-    Noesis::Ptr<Noesis::TextBlock> caseboardDebugText;             // Debug text overlay
-    
+    Noesis::Ptr<Noesis::Grid> caseboardPanel;    // Main caseboard container
+    Noesis::Ptr<Noesis::Panel> caseboardContent; // Pannable content canvas
+    Noesis::ScaleTransform *caseboardZoomTransform =
+        nullptr; // Zoom transform (owned by TransformGroup)
+    Noesis::TranslateTransform *caseboardPanTransform =
+        nullptr;                                       // Pan transform (owned by TransformGroup)
+    Noesis::Ptr<Noesis::TextBlock> caseboardDebugText; // Debug text overlay
+
     // Note cards
     struct NoteCard {
-        Noesis::Ptr<Noesis::Grid> container;  // The note card container
-        Noesis::Ptr<Noesis::TextBox> textBox; // Editable text (when editing)
+        Noesis::Ptr<Noesis::Grid> container;      // The note card container
+        Noesis::Ptr<Noesis::TextBox> textBox;     // Editable text (when editing)
         Noesis::Ptr<Noesis::TextBlock> textLabel; // Display text (when not editing)
-        float boardX = 0.0f;                   // Position in board space
+        float boardX = 0.0f;                      // Position in board space
         float boardY = 0.0f;
-        bool isEditing = false;               // Currently being edited
-        std::string savedText;                // The saved note text
+        bool isEditing = false; // Currently being edited
+        std::string savedText;  // The saved note text
     };
     std::vector<NoteCard> noteCards;
-    int editingNoteCardIndex = -1;            // Index of note card being edited, -1 if none
+    int editingNoteCardIndex = -1; // Index of note card being edited, -1 if none
 
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
@@ -135,23 +137,23 @@ class NoesisRenderPath : public wi::RenderPath3D {
     bool inDialogueMode = false;
     wi::ecs::Entity dialogueNPCEntity = wi::ecs::INVALID_ENTITY; // NPC we're talking to
     std::string dialogueNPCName = "NPC";                         // Name of NPC for dialogue display
-    
+
     // Caseboard mode state
     bool inCaseboardMode = false;
-    bool caseboardJustEntered = false;  // Flag to skip first frame after entering
-    
+    bool caseboardJustEntered = false; // Flag to skip first frame after entering
+
     // Caseboard pan/zoom state
     float caseboardZoom = 1.0f;
     float caseboardPanX = 0.0f;
     float caseboardPanY = 0.0f;
     bool caseboardPanning = false;
     POINT caseboardLastMousePos = {};
-    POINT caseboardCurrentMousePos = {};  // Current mouse position (screen space)
-    
+    POINT caseboardCurrentMousePos = {}; // Current mouse position (screen space)
+
     // Caseboard visible/pannable area (symmetric around origin)
     // This defines the area accessible via panning at any zoom level
-    float caseboardVisibleHalfX = 3000.0f;  // Can pan to see -3000 to +3000 horizontally
-    float caseboardVisibleHalfY = 3000.0f;  // Adjusted for aspect ratio on enter
+    float caseboardVisibleHalfX = 3000.0f; // Can pan to see -3000 to +3000 horizontally
+    float caseboardVisibleHalfY = 3000.0f; // Adjusted for aspect ratio on enter
 
     // Fullscreen state
     HWND windowHandle = nullptr;
@@ -275,7 +277,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
         textBlock->SetText(entryText.c_str());
         textBlock->SetTextWrapping(Noesis::TextWrapping_Wrap);
         textBlock->SetFontSize(16.0f);
-        
+
         // Override global TextBlock style properties that cause issues
         textBlock->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
         textBlock->SetHorizontalAlignment(Noesis::HorizontalAlignment_Left);
@@ -343,26 +345,26 @@ class NoesisRenderPath : public wi::RenderPath3D {
         // For now, add a placeholder NPC response
         // In the future, this would be replaced with actual dialogue system
     }
-    
+
     // Check if caseboard mode is active
     bool IsCaseboardModeActive() const { return inCaseboardMode; }
-    
+
     // Enter caseboard mode
     void EnterCaseboardMode() {
         if (inCaseboardMode || inDialogueMode)
             return;
-        
+
         inCaseboardMode = true;
-        caseboardJustEntered = true;  // Skip first frame to avoid immediate exit
+        caseboardJustEntered = true; // Skip first frame to avoid immediate exit
         caseboardPanning = false;
-        
+
         // Calculate visible area dimensions based on window aspect ratio
         if (windowHandle) {
             RECT clientRect;
             GetClientRect(windowHandle, &clientRect);
             float viewportHoriz = (float)(clientRect.right - clientRect.left);
             float viewportVert = (float)(clientRect.bottom - clientRect.top);
-            
+
             // Set visible area: 3000 units in the smaller dimension, scaled for aspect ratio
             // This ensures the visible area matches the window's aspect ratio
             if (viewportHoriz > viewportVert) {
@@ -370,17 +372,17 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 caseboardVisibleHalfY = 3000.0f;
                 caseboardVisibleHalfX = 3000.0f * (viewportHoriz / viewportVert);
             } else {
-                // Portrait: width is smaller  
+                // Portrait: width is smaller
                 caseboardVisibleHalfX = 3000.0f;
                 caseboardVisibleHalfY = 3000.0f * (viewportVert / viewportHoriz);
             }
-            
+
             char buf[256];
             sprintf_s(buf, "Caseboard visible area: %.0f x %.0f (half-extents)\n",
-                caseboardVisibleHalfX, caseboardVisibleHalfY);
+                      caseboardVisibleHalfX, caseboardVisibleHalfY);
             OutputDebugStringA(buf);
         }
-        
+
         // Reset pan/zoom to default (origin centered on screen)
         caseboardZoom = 1.0f;
         // Center origin on screen: pan = viewport / 2
@@ -394,50 +396,50 @@ class NoesisRenderPath : public wi::RenderPath3D {
             caseboardPanY = 0.0f;
         }
         UpdateCaseboardTransforms();
-        
+
         // Show caseboard panel
         if (caseboardPanel) {
             caseboardPanel->SetVisibility(Noesis::Visibility_Visible);
         }
-        
+
         // Hide talk indicator
         if (talkIndicator) {
             talkIndicator->SetVisibility(Noesis::Visibility_Collapsed);
         }
-        
+
         // Hide aim dot
         aimDotVisible = false;
-        
+
         // Release mouse capture for UI interaction
         SetFirstPersonMode(false);
-        
+
         OutputDebugStringA("Entered caseboard mode\n");
     }
-    
+
     // Exit caseboard mode
     void ExitCaseboardMode() {
         if (!inCaseboardMode)
             return;
-        
+
         // Finalize any note card being edited
         if (editingNoteCardIndex >= 0) {
             FinalizeNoteCardEdit();
         }
-        
+
         inCaseboardMode = false;
         caseboardPanning = false;
-        
+
         // Hide caseboard panel
         if (caseboardPanel) {
             caseboardPanel->SetVisibility(Noesis::Visibility_Collapsed);
         }
-        
+
         // Re-enable walkabout controls
         SetFirstPersonMode(true);
-        
+
         OutputDebugStringA("Exited caseboard mode\n");
     }
-    
+
     // Update caseboard transforms based on current pan/zoom state
     void UpdateCaseboardTransforms() {
         if (caseboardZoomTransform) {
@@ -450,177 +452,198 @@ class NoesisRenderPath : public wi::RenderPath3D {
         }
         UpdateCaseboardDebugText();
     }
-    
+
     // Update caseboard debug text with current mouse position (board space) and zoom
     void UpdateCaseboardDebugText() {
         if (!caseboardDebugText)
             return;
-        
+
         // Convert screen mouse position to board space
         // Board space = (screen - pan) / zoom
         float boardX = (caseboardCurrentMousePos.x - caseboardPanX) / caseboardZoom;
         float boardY = (caseboardCurrentMousePos.y - caseboardPanY) / caseboardZoom;
-        
+
         // Format debug text showing position and visible area bounds
         char debugStr[256];
-        snprintf(debugStr, sizeof(debugStr), 
-            "Board: (%.0f, %.0f)  Zoom: %.2fx  Visible: +/-%.0f x +/-%.0f", 
-            boardX, boardY, caseboardZoom, caseboardVisibleHalfX, caseboardVisibleHalfY);
+        snprintf(debugStr, sizeof(debugStr),
+                 "Board: (%.0f, %.0f)  Zoom: %.2fx  Visible: +/-%.0f x +/-%.0f", boardX, boardY,
+                 caseboardZoom, caseboardVisibleHalfX, caseboardVisibleHalfY);
         caseboardDebugText->SetText(debugStr);
     }
-    
+
     // Handle caseboard zoom (mouse wheel)
     void CaseboardZoom(int x, int y, float delta) {
         if (!inCaseboardMode)
             return;
-        
+
         // Store mouse position before zoom
         float mouseX = (float)x;
         float mouseY = (float)y;
-        
+
         // Calculate world position under mouse before zoom
         float worldXBefore = (mouseX - caseboardPanX) / caseboardZoom;
         float worldYBefore = (mouseY - caseboardPanY) / caseboardZoom;
-        
+
         // Apply zoom
         float zoomDelta = delta * 0.001f; // Adjust sensitivity
         caseboardZoom = std::clamp(caseboardZoom + zoomDelta, 0.2f, 4.0f);
-        
+
         // Calculate world position under mouse after zoom
         float worldXAfter = (mouseX - caseboardPanX) / caseboardZoom;
         float worldYAfter = (mouseY - caseboardPanY) / caseboardZoom;
-        
+
         // Adjust pan to keep mouse position stable
         caseboardPanX += (worldXAfter - worldXBefore) * caseboardZoom;
         caseboardPanY += (worldYAfter - worldYBefore) * caseboardZoom;
-        
+
         // Clamp pan to board bounds after zoom
         ClampCaseboardPan();
-        
+
         UpdateCaseboardTransforms();
     }
-    
+
     // Handle caseboard pan start (mouse down)
     void CaseboardPanStart(int x, int y) {
         if (!inCaseboardMode)
             return;
-        
+
+        // Convert click position to board space
+        float boardClickX = (x - caseboardPanX) / caseboardZoom;
+        float boardClickY = (y - caseboardPanY) / caseboardZoom;
+
         // If we're editing a note and click elsewhere, finalize the edit
         if (editingNoteCardIndex >= 0 && editingNoteCardIndex < (int)noteCards.size()) {
-            NoteCard& card = noteCards[editingNoteCardIndex];
-            
-            // Convert click position to board space
-            float boardClickX = (x - caseboardPanX) / caseboardZoom;
-            float boardClickY = (y - caseboardPanY) / caseboardZoom;
-            
-            // Check if click is outside the note card (with some padding)
+            NoteCard &card = noteCards[editingNoteCardIndex];
+
+            // Check if click is outside the note card
             float cardLeft = card.boardX - 90.0f;
             float cardTop = card.boardY - 110.0f;
             float cardRight = cardLeft + 180.0f;
             float cardBottom = cardTop + 220.0f;
-            
+
             bool clickedOutside = (boardClickX < cardLeft || boardClickX > cardRight ||
                                    boardClickY < cardTop || boardClickY > cardBottom);
-            
+
             if (clickedOutside) {
                 FinalizeNoteCardEdit();
             }
         }
-        
+
+        // Check if clicking on a non-editing note card to start editing it
+        if (editingNoteCardIndex < 0) {
+            for (int i = 0; i < (int)noteCards.size(); i++) {
+                NoteCard &card = noteCards[i];
+                if (card.isEditing)
+                    continue; // Already being edited (shouldn't happen)
+
+                // Check if click is inside this note card's editable area
+                float cardLeft = card.boardX - 90.0f + 15.0f; // Add text margin
+                float cardTop = card.boardY - 110.0f + 40.0f; // Add text margin
+                float cardRight = card.boardX - 90.0f + 180.0f - 15.0f;
+                float cardBottom = card.boardY - 110.0f + 220.0f - 20.0f;
+
+                if (boardClickX >= cardLeft && boardClickX <= cardRight && boardClickY >= cardTop &&
+                    boardClickY <= cardBottom) {
+                    // Start editing this note card
+                    StartEditingNoteCard(i);
+                    return; // Don't start panning
+                }
+            }
+        }
+
         caseboardPanning = true;
         caseboardLastMousePos.x = x;
         caseboardLastMousePos.y = y;
     }
-    
+
     // Handle caseboard pan end (mouse up)
-    void CaseboardPanEnd() {
-        caseboardPanning = false;
-    }
-    
+    void CaseboardPanEnd() { caseboardPanning = false; }
+
     // Handle caseboard pan move (mouse move while dragging)
     // Clamp pan values to keep board visible within viewport
     void ClampCaseboardPan() {
         if (!windowHandle)
             return;
-        
+
         RECT clientRect;
         GetClientRect(windowHandle, &clientRect);
-        
+
         // Actual viewport dimensions
         float viewportHoriz = (float)(clientRect.right - clientRect.left);
         float viewportVert = (float)(clientRect.bottom - clientRect.top);
-        
+
         // Pan limits based on visible area (symmetric around origin: -halfX to +halfX)
         // To see board position -halfX at screen left: 0 = -halfX * zoom + pan → pan = halfX * zoom
-        // To see board position +halfX at screen right: viewport = halfX * zoom + pan → pan = viewport - halfX * zoom
+        // To see board position +halfX at screen right: viewport = halfX * zoom + pan → pan =
+        // viewport - halfX * zoom
         float maxPanX = caseboardVisibleHalfX * caseboardZoom;
         float minPanX = viewportHoriz - caseboardVisibleHalfX * caseboardZoom;
-        
+
         float maxPanY = caseboardVisibleHalfY * caseboardZoom;
         float minPanY = viewportVert - caseboardVisibleHalfY * caseboardZoom;
-        
+
         // If visible area is smaller than viewport at current zoom, center origin on screen
         if (minPanX > maxPanX) {
             caseboardPanX = viewportHoriz / 2.0f;
         } else {
             caseboardPanX = std::clamp(caseboardPanX, minPanX, maxPanX);
         }
-        
+
         if (minPanY > maxPanY) {
             caseboardPanY = viewportVert / 2.0f;
         } else {
             caseboardPanY = std::clamp(caseboardPanY, minPanY, maxPanY);
         }
     }
-    
+
     void CaseboardPanMove(int x, int y) {
         if (!inCaseboardMode)
             return;
-        
+
         // Always update current mouse pos for debug display
         caseboardCurrentMousePos.x = x;
         caseboardCurrentMousePos.y = y;
-        
+
         if (caseboardPanning) {
             float deltaX = (float)(x - caseboardLastMousePos.x);
             float deltaY = (float)(y - caseboardLastMousePos.y);
-            
+
             caseboardPanX += deltaX;
             caseboardPanY += deltaY;
-            
+
             // Clamp pan to board bounds
             ClampCaseboardPan();
-            
+
             caseboardLastMousePos.x = x;
             caseboardLastMousePos.y = y;
-            
+
             UpdateCaseboardTransforms();
         } else {
             // Just update debug text when not panning
             UpdateCaseboardDebugText();
         }
     }
-    
+
     // Add a note card at the center of the current view
     void AddNoteCard() {
         if (!inCaseboardMode || !caseboardContent)
             return;
-        
+
         // Get the center of the current view in board space
         RECT clientRect;
         GetClientRect(windowHandle, &clientRect);
         float viewCenterX = (float)(clientRect.right - clientRect.left) / 2.0f;
         float viewCenterY = (float)(clientRect.bottom - clientRect.top) / 2.0f;
-        
+
         // Convert to board space
         float boardX = (viewCenterX - caseboardPanX) / caseboardZoom;
         float boardY = (viewCenterY - caseboardPanY) / caseboardZoom;
-        
+
         // Create the note card container (Grid with Image background and TextBox)
         Noesis::Ptr<Noesis::Grid> noteContainer = *new Noesis::Grid();
         noteContainer->SetWidth(180.0f);
         noteContainer->SetHeight(220.0f);
-        
+
         // Create and set up the background image
         Noesis::Ptr<Noesis::Image> bgImage = *new Noesis::Image();
         Noesis::Ptr<Noesis::BitmapImage> bitmapSource = *new Noesis::BitmapImage();
@@ -628,7 +651,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
         bgImage->SetSource(bitmapSource);
         bgImage->SetStretch(Noesis::Stretch_Fill);
         noteContainer->GetChildren()->Add(bgImage);
-        
+
         // Create the text box for note input
         Noesis::Ptr<Noesis::TextBox> textBox = *new Noesis::TextBox();
         textBox->SetText("");
@@ -636,107 +659,162 @@ class NoesisRenderPath : public wi::RenderPath3D {
         textBox->SetAcceptsReturn(true);
         textBox->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
         textBox->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
-        textBox->SetMargin(Noesis::Thickness(15.0f, 40.0f, 15.0f, 20.0f));  // Padding for note paper lines
+        textBox->SetMargin(
+            Noesis::Thickness(15.0f, 40.0f, 15.0f, 20.0f)); // Padding for note paper lines
         textBox->SetFontSize(14.0f);
         textBox->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI"));
-        
+
         // Dark blue ink color for note text
-        Noesis::Ptr<Noesis::SolidColorBrush> inkBrush = Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C));
+        Noesis::Ptr<Noesis::SolidColorBrush> inkBrush =
+            Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C));
         textBox->SetForeground(inkBrush);
-        textBox->SetBackground(nullptr);  // Transparent background
-        textBox->SetBorderThickness(Noesis::Thickness(0.0f));  // No border
+        textBox->SetBackground(nullptr);                      // Transparent background
+        textBox->SetBorderThickness(Noesis::Thickness(0.0f)); // No border
         textBox->SetCaretBrush(inkBrush);
         noteContainer->GetChildren()->Add(textBox);
-        
+
         // Position the note card on the canvas
-        Noesis::Canvas::SetLeft(noteContainer, boardX - 90.0f);  // Center horizontally
-        Noesis::Canvas::SetTop(noteContainer, boardY - 110.0f);  // Center vertically
-        
+        Noesis::Canvas::SetLeft(noteContainer, boardX - 90.0f); // Center horizontally
+        Noesis::Canvas::SetTop(noteContainer, boardY - 110.0f); // Center vertically
+
         // Add to the caseboard content
-        Noesis::UIElementCollection* children = caseboardContent->GetChildren();
+        Noesis::UIElementCollection *children = caseboardContent->GetChildren();
         if (children) {
             children->Add(noteContainer);
         }
-        
+
         // Store reference
         NoteCard card;
         card.container = noteContainer;
         card.textBox = textBox;
-        card.textLabel = nullptr;  // Will be created when editing is finalized
+        card.textLabel = nullptr; // Will be created when editing is finalized
         card.boardX = boardX;
         card.boardY = boardY;
         card.isEditing = true;
         card.savedText = "";
         noteCards.push_back(card);
-        
+
         // Track which note card is being edited
         editingNoteCardIndex = (int)noteCards.size() - 1;
-        
+
         // Focus the text box for immediate typing
         textBox->Focus();
-        
+
         char buf[128];
         sprintf_s(buf, "Added note card at board position (%.0f, %.0f)\n", boardX, boardY);
         OutputDebugStringA(buf);
     }
-    
+
     // Finalize note card editing - save text and replace TextBox with TextBlock
     void FinalizeNoteCardEdit() {
         if (editingNoteCardIndex < 0 || editingNoteCardIndex >= (int)noteCards.size())
             return;
-        
-        NoteCard& card = noteCards[editingNoteCardIndex];
+
+        NoteCard &card = noteCards[editingNoteCardIndex];
         if (!card.isEditing || !card.textBox)
             return;
-        
+
         // Get the text from the TextBox
-        const char* text = card.textBox->GetText();
+        const char *text = card.textBox->GetText();
         card.savedText = text ? text : "";
-        
+
         // Remove the TextBox from the container
-        Noesis::UIElementCollection* children = card.container->GetChildren();
+        Noesis::UIElementCollection *children = card.container->GetChildren();
         if (children) {
             children->Remove(card.textBox.GetPtr());
         }
-        
+
         // Create a TextBlock to display the saved text
         Noesis::Ptr<Noesis::TextBlock> textLabel = *new Noesis::TextBlock();
         textLabel->SetText(card.savedText.c_str());
         textLabel->SetTextWrapping(Noesis::TextWrapping_Wrap);
         textLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
         textLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Left);
-        textLabel->SetMargin(Noesis::Thickness(15.0f, 40.0f, 15.0f, 20.0f));
+        // Adjusted margins to match TextBox internal padding (-2px X, -4px Y from current)
+        textLabel->SetMargin(Noesis::Thickness(27.0f, 48.0f, 15.0f, 20.0f));
         textLabel->SetFontSize(14.0f);
         textLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI"));
         textLabel->SetFontWeight(Noesis::FontWeight_Normal);
-        
+
         // Dark blue ink color
-        Noesis::Ptr<Noesis::SolidColorBrush> inkBrush = Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C));
+        Noesis::Ptr<Noesis::SolidColorBrush> inkBrush =
+            Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C));
         textLabel->SetForeground(inkBrush);
-        
+
         // Override the global TextBlock style effects
         textLabel->SetEffect(nullptr);
-        
+
         // Add the TextBlock to the container
         if (children) {
             children->Add(textLabel);
         }
-        
+
         // Update the note card state
         card.textLabel = textLabel;
-        card.textBox.Reset();  // Release the TextBox
+        card.textBox.Reset(); // Release the TextBox
         card.isEditing = false;
-        
+
         editingNoteCardIndex = -1;
-        
+
         OutputDebugStringA("Finalized note card edit\n");
     }
-    
+
     // Handle click on caseboard - finalize any active note edit
     void OnCaseboardClick() {
         if (editingNoteCardIndex >= 0) {
             FinalizeNoteCardEdit();
         }
+    }
+
+    // Start editing an existing note card (replace TextBlock with TextBox)
+    void StartEditingNoteCard(int index) {
+        if (index < 0 || index >= (int)noteCards.size())
+            return;
+
+        NoteCard &card = noteCards[index];
+        if (card.isEditing)
+            return; // Already editing
+
+        // Remove the TextBlock from the container
+        Noesis::UIElementCollection *children = card.container->GetChildren();
+        if (children && card.textLabel) {
+            children->Remove(card.textLabel.GetPtr());
+        }
+
+        // Create a new TextBox with the saved text
+        Noesis::Ptr<Noesis::TextBox> textBox = *new Noesis::TextBox();
+        textBox->SetText(card.savedText.c_str());
+        textBox->SetTextWrapping(Noesis::TextWrapping_Wrap);
+        textBox->SetAcceptsReturn(true);
+        textBox->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
+        textBox->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
+        textBox->SetMargin(Noesis::Thickness(15.0f, 40.0f, 15.0f, 20.0f));
+        textBox->SetFontSize(14.0f);
+        textBox->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI"));
+
+        // Dark blue ink color
+        Noesis::Ptr<Noesis::SolidColorBrush> inkBrush =
+            Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C));
+        textBox->SetForeground(inkBrush);
+        textBox->SetBackground(nullptr);
+        textBox->SetBorderThickness(Noesis::Thickness(0.0f));
+        textBox->SetCaretBrush(inkBrush);
+
+        // Add the TextBox to the container
+        if (children) {
+            children->Add(textBox);
+        }
+
+        // Update state
+        card.textBox = textBox;
+        card.textLabel.Reset();
+        card.isEditing = true;
+        editingNoteCardIndex = index;
+
+        // Focus the text box
+        textBox->Focus();
+
+        OutputDebugStringA("Started editing existing note card\n");
     }
 
     // Config file management
@@ -1544,7 +1622,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
             // Skip walkabout controls while in dialogue
             return;
         }
-        
+
         // Handle caseboard mode input
         if (inCaseboardMode) {
             // Skip first frame after entering to avoid immediate exit when C is still held
@@ -1552,7 +1630,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 caseboardJustEntered = false;
                 return;
             }
-            
+
             // Escape or C key - exit caseboard mode
             static bool escWasPressedCaseboard = false;
             static bool cWasPressedCaseboard = false;
@@ -1563,7 +1641,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
             }
             escWasPressedCaseboard = escPressed;
             cWasPressedCaseboard = cPressed;
-            
+
             // N key - add a new note card
             static bool nWasPressed = false;
             bool nPressed = (GetAsyncKeyState('N') & 0x8000) != 0;
@@ -1802,7 +1880,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     EnterDialogueMode(aimedNPCEntity);
                 }
                 tWasPressed = tPressed;
-                
+
                 // C key - toggle caseboard mode
                 static bool cWasPressed = false;
                 bool cPressed = (GetAsyncKeyState('C') & 0x8000) != 0;
@@ -1959,13 +2037,13 @@ class NoesisRenderPath : public wi::RenderPath3D {
     bool MouseWheel(int x, int y, int delta) {
         if (!uiView)
             return false;
-        
+
         // Handle caseboard zoom
         if (inCaseboardMode) {
             CaseboardZoom(x, y, (float)delta);
             return true;
         }
-        
+
         // Forward to Noesis
         return uiView->MouseWheel(x, y, delta);
     }
@@ -2042,20 +2120,23 @@ class NoesisRenderPath : public wi::RenderPath3D {
         dialogueList = FindElementByName<Noesis::StackPanel>(rootGrid, "DialogueList");
         dialogueInput = FindElementByName<Noesis::TextBox>(rootGrid, "DialogueInput");
         dialogueHintText = FindElementByName<Noesis::TextBlock>(rootGrid, "DialogueHintText");
-        
+
         // Find caseboard panel UI elements
         caseboardPanel = FindElementByName<Noesis::Grid>(rootGrid, "CaseboardPanel");
         caseboardDebugText = FindElementByName<Noesis::TextBlock>(rootGrid, "CaseboardDebugText");
-        
+
         // Find the CaseboardContent canvas and get its transforms
         caseboardContent = FindElementByName<Noesis::Panel>(rootGrid, "CaseboardContent");
         if (caseboardContent) {
-            Noesis::Transform* transform = caseboardContent->GetRenderTransform();
+            Noesis::Transform *transform = caseboardContent->GetRenderTransform();
             if (transform) {
-                Noesis::TransformGroup* transformGroup = Noesis::DynamicCast<Noesis::TransformGroup*>(transform);
+                Noesis::TransformGroup *transformGroup =
+                    Noesis::DynamicCast<Noesis::TransformGroup *>(transform);
                 if (transformGroup && transformGroup->GetNumChildren() >= 2) {
-                    caseboardZoomTransform = Noesis::DynamicCast<Noesis::ScaleTransform*>(transformGroup->GetChild(0));
-                    caseboardPanTransform = Noesis::DynamicCast<Noesis::TranslateTransform*>(transformGroup->GetChild(1));
+                    caseboardZoomTransform =
+                        Noesis::DynamicCast<Noesis::ScaleTransform *>(transformGroup->GetChild(0));
+                    caseboardPanTransform = Noesis::DynamicCast<Noesis::TranslateTransform *>(
+                        transformGroup->GetChild(1));
                 }
             }
         }
