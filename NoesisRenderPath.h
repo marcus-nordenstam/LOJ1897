@@ -15,14 +15,28 @@
 #include <NsCore/Nullable.h>
 #include <NsCore/ReflectionImplement.h>
 #include <NsDrawing/Color.h>
+#include <NsDrawing/Thickness.h>
+#include <NsGui/Border.h>
 #include <NsGui/Button.h>
+#include <NsGui/Enums.h>
+#include <NsGui/FontFamily.h>
+#include <NsGui/FontProperties.h>
 #include <NsGui/Grid.h>
 #include <NsGui/IRenderer.h>
 #include <NsGui/IView.h>
 #include <NsGui/InputEnums.h>
 #include <NsGui/IntegrationAPI.h>
+#include <NsGui/ScaleTransform.h>
+#include <NsGui/ScrollViewer.h>
 #include <NsGui/SolidColorBrush.h>
+#include <NsGui/TransformGroup.h>
+#include <NsGui/TranslateTransform.h>
+#include <NsGui/StackPanel.h>
+#include <NsGui/TextBlock.h>
 #include <NsGui/TextBox.h>
+#include <NsGui/TextProperties.h>
+#include <NsGui/UIElement.h>
+#include <NsGui/UIElementCollection.h>
 #include <NsGui/Uri.h>
 #include <NsGui/UserControl.h>
 #include <NsRender/D3D12Factory.h>
@@ -43,7 +57,21 @@ class NoesisRenderPath : public wi::RenderPath3D {
     Noesis::Ptr<Noesis::Button> fullscreenButton;      // Fullscreen toggle button
     Noesis::Ptr<Noesis::FrameworkElement> rootElement; // Root element from XAML
     Noesis::Ptr<Noesis::Grid> menuContainer;           // Menu container (hidden during gameplay)
-    Noesis::Ptr<Noesis::FrameworkElement> talkIndicator; // Talk indicator (shown when aiming at NPC)
+    Noesis::Ptr<Noesis::FrameworkElement>
+        talkIndicator; // Talk indicator (shown when aiming at NPC)
+
+    // Dialogue panel elements
+    Noesis::Ptr<Noesis::Grid> dialoguePanelRoot;            // Main dialogue panel container
+    Noesis::Ptr<Noesis::ScrollViewer> dialogueScrollViewer; // Scrollable dialogue history
+    Noesis::Ptr<Noesis::StackPanel> dialogueList;           // Container for dialogue entries
+    Noesis::Ptr<Noesis::TextBox> dialogueInput;             // Text input for player dialogue
+    Noesis::Ptr<Noesis::TextBlock> dialogueHintText;        // Hint text for "[T] Take Testimony"
+    
+    // Caseboard panel elements
+    Noesis::Ptr<Noesis::Grid> caseboardPanel;               // Main caseboard container
+    Noesis::ScaleTransform* caseboardZoomTransform = nullptr;      // Zoom transform (owned by TransformGroup)
+    Noesis::TranslateTransform* caseboardPanTransform = nullptr;   // Pan transform (owned by TransformGroup)
+
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
 
@@ -81,7 +109,23 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Aim dot (reticle) - raycast from character's eye in camera direction
     bool aimDotVisible = false;
     XMFLOAT2 aimDotScreenPos = {0, 0};
-    bool aimingAtNPC = false; // True if aim ray hits an NPC
+    bool aimingAtNPC = false;                                 // True if aim ray hits an NPC
+    wi::ecs::Entity aimedNPCEntity = wi::ecs::INVALID_ENTITY; // The NPC entity being aimed at
+
+    // Dialogue mode state
+    bool inDialogueMode = false;
+    wi::ecs::Entity dialogueNPCEntity = wi::ecs::INVALID_ENTITY; // NPC we're talking to
+    std::string dialogueNPCName = "NPC";                         // Name of NPC for dialogue display
+    
+    // Caseboard mode state
+    bool inCaseboardMode = false;
+    
+    // Caseboard pan/zoom state
+    float caseboardZoom = 1.0f;
+    float caseboardPanX = 0.0f;
+    float caseboardPanY = 0.0f;
+    bool caseboardPanning = false;
+    POINT caseboardLastMousePos = {};
 
     // Fullscreen state
     HWND windowHandle = nullptr;
@@ -105,6 +149,306 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     // Check if menu is visible (for input routing)
     bool IsMenuVisible() const { return menuVisible; }
+
+    // Check if dialogue mode is active
+    bool IsDialogueModeActive() const { return inDialogueMode; }
+
+    // Enter dialogue mode with an NPC
+    void EnterDialogueMode(wi::ecs::Entity npcEntity) {
+        if (inDialogueMode)
+            return;
+
+        inDialogueMode = true;
+        dialogueNPCEntity = npcEntity;
+
+        // Get NPC name from scene
+        wi::scene::Scene &scene = wi::scene::GetScene();
+        const wi::scene::NameComponent *nameComp = scene.names.GetComponent(npcEntity);
+        dialogueNPCName = nameComp ? nameComp->name : "NPC";
+
+        // Clean up the name (remove path prefixes if present)
+        size_t lastSlash = dialogueNPCName.find_last_of("/\\");
+        if (lastSlash != std::string::npos) {
+            dialogueNPCName = dialogueNPCName.substr(lastSlash + 1);
+        }
+
+        // Show dialogue panel
+        if (dialoguePanelRoot) {
+            dialoguePanelRoot->SetVisibility(Noesis::Visibility_Visible);
+        }
+
+        // Hide talk indicator
+        if (talkIndicator) {
+            talkIndicator->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+
+        // Hide aim dot
+        aimDotVisible = false;
+
+        // Release mouse capture for UI interaction
+        SetFirstPersonMode(false);
+
+        // Clear previous dialogue and add initial greeting
+        ClearDialogue();
+        AddDialogueEntry("Dr Robban", "Good day. How may I help you?");
+        AddDialogueEntry("You", "Wohoo this is working");
+        AddDialogueEntry("Dr Robban", "We're not out of the woods just yet");
+
+        // Focus the input box
+        if (dialogueInput && uiView) {
+            dialogueInput->Focus();
+        }
+
+        char buffer[256];
+        sprintf_s(buffer, "Entered dialogue mode with %s (Entity: %llu)\n", dialogueNPCName.c_str(),
+                  npcEntity);
+        OutputDebugStringA(buffer);
+    }
+
+    // Exit dialogue mode
+    void ExitDialogueMode() {
+        if (!inDialogueMode)
+            return;
+
+        inDialogueMode = false;
+        dialogueNPCEntity = wi::ecs::INVALID_ENTITY;
+
+        // Hide dialogue panel
+        if (dialoguePanelRoot) {
+            dialoguePanelRoot->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+
+        // Hide hint text
+        if (dialogueHintText) {
+            dialogueHintText->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+
+        // Re-enable walkabout controls
+        SetFirstPersonMode(true);
+
+        OutputDebugStringA("Exited dialogue mode\n");
+    }
+
+    // Clear all dialogue entries
+    void ClearDialogue() {
+        if (dialogueList) {
+            dialogueList->GetChildren()->Clear();
+        }
+    }
+
+    // Add a dialogue entry to the panel
+    void AddDialogueEntry(const std::string &speaker, const std::string &message) {
+        if (!dialogueList)
+            return;
+
+        // Create TextBlock for the entry
+        Noesis::Ptr<Noesis::TextBlock> textBlock = Noesis::MakePtr<Noesis::TextBlock>();
+
+        // Format: "SPEAKER  -  Message"
+        std::string entryText = speaker + "  -  " + message;
+        textBlock->SetText(entryText.c_str());
+        textBlock->SetTextWrapping(Noesis::TextWrapping_Wrap);
+        textBlock->SetFontSize(16.0f);
+        
+        // Override global TextBlock style properties that cause issues
+        textBlock->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
+        textBlock->SetHorizontalAlignment(Noesis::HorizontalAlignment_Left);
+        textBlock->SetFontWeight(Noesis::FontWeight_Normal);
+        textBlock->SetEffect(nullptr); // Remove DropShadow from global style
+
+        // Set font family
+        Noesis::Ptr<Noesis::FontFamily> fontFamily =
+            Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI");
+        textBlock->SetFontFamily(fontFamily);
+
+        // Set color based on speaker (player = cream, NPC = light blue)
+        bool isPlayer = (speaker == "YOU" || speaker == "You");
+        if (isPlayer) {
+            Noesis::Ptr<Noesis::SolidColorBrush> brush =
+                Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(235, 233, 225)); // #FFEBE9E1
+            textBlock->SetForeground(brush);
+        } else {
+            Noesis::Ptr<Noesis::SolidColorBrush> brush =
+                Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(154, 190, 214)); // #FF9ABED6
+            textBlock->SetForeground(brush);
+        }
+
+        // Wrap in a Border for proper padding/margin
+        Noesis::Ptr<Noesis::Border> border = Noesis::MakePtr<Noesis::Border>();
+        border->SetPadding(Noesis::Thickness(14, 8, 14, 8));
+        border->SetChild(textBlock);
+
+        // Add to dialogue list
+        dialogueList->GetChildren()->Add(border);
+
+        // Scroll to bottom
+        ScrollDialogueToBottom();
+    }
+
+    // Scroll dialogue to show newest content (at bottom)
+    void ScrollDialogueToBottom() {
+        if (dialogueScrollViewer) {
+            // Update layout first to ensure new content is measured
+            dialogueScrollViewer->UpdateLayout();
+            // Scroll to bottom to show newest messages
+            dialogueScrollViewer->ScrollToEnd();
+        }
+    }
+
+    // Handle dialogue input submission
+    void OnDialogueInputCommitted() {
+        if (!dialogueInput || !inDialogueMode)
+            return;
+
+        const char *inputText = dialogueInput->GetText();
+        if (!inputText || strlen(inputText) == 0)
+            return;
+
+        // Add player's message
+        AddDialogueEntry("YOU", inputText);
+
+        // Clear input
+        dialogueInput->SetText("");
+
+        // Keep focus on input
+        dialogueInput->Focus();
+
+        // TODO: Process dialogue (AI response, game logic, etc.)
+        // For now, add a placeholder NPC response
+        // In the future, this would be replaced with actual dialogue system
+    }
+    
+    // Check if caseboard mode is active
+    bool IsCaseboardModeActive() const { return inCaseboardMode; }
+    
+    // Enter caseboard mode
+    void EnterCaseboardMode() {
+        if (inCaseboardMode || inDialogueMode)
+            return;
+        
+        inCaseboardMode = true;
+        caseboardPanning = false;
+        
+        // Reset pan/zoom to default (centered view)
+        caseboardZoom = 1.0f;
+        caseboardPanX = 0.0f;
+        caseboardPanY = 0.0f;
+        UpdateCaseboardTransforms();
+        
+        // Show caseboard panel
+        if (caseboardPanel) {
+            caseboardPanel->SetVisibility(Noesis::Visibility_Visible);
+        }
+        
+        // Hide talk indicator
+        if (talkIndicator) {
+            talkIndicator->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        
+        // Hide aim dot
+        aimDotVisible = false;
+        
+        // Release mouse capture for UI interaction
+        SetFirstPersonMode(false);
+        
+        OutputDebugStringA("Entered caseboard mode\n");
+    }
+    
+    // Exit caseboard mode
+    void ExitCaseboardMode() {
+        if (!inCaseboardMode)
+            return;
+        
+        inCaseboardMode = false;
+        caseboardPanning = false;
+        
+        // Hide caseboard panel
+        if (caseboardPanel) {
+            caseboardPanel->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        
+        // Re-enable walkabout controls
+        SetFirstPersonMode(true);
+        
+        OutputDebugStringA("Exited caseboard mode\n");
+    }
+    
+    // Update caseboard transforms based on current pan/zoom state
+    void UpdateCaseboardTransforms() {
+        if (caseboardZoomTransform) {
+            caseboardZoomTransform->SetScaleX(caseboardZoom);
+            caseboardZoomTransform->SetScaleY(caseboardZoom);
+        }
+        if (caseboardPanTransform) {
+            caseboardPanTransform->SetX(caseboardPanX);
+            caseboardPanTransform->SetY(caseboardPanY);
+        }
+    }
+    
+    // Handle caseboard zoom (mouse wheel)
+    void CaseboardZoom(int x, int y, float delta) {
+        if (!inCaseboardMode)
+            return;
+        
+        // Store mouse position before zoom
+        float mouseX = (float)x;
+        float mouseY = (float)y;
+        
+        // Calculate world position under mouse before zoom
+        float worldXBefore = (mouseX - caseboardPanX) / caseboardZoom;
+        float worldYBefore = (mouseY - caseboardPanY) / caseboardZoom;
+        
+        // Apply zoom
+        float zoomDelta = delta * 0.001f; // Adjust sensitivity
+        caseboardZoom = std::clamp(caseboardZoom + zoomDelta, 0.2f, 4.0f);
+        
+        // Calculate world position under mouse after zoom
+        float worldXAfter = (mouseX - caseboardPanX) / caseboardZoom;
+        float worldYAfter = (mouseY - caseboardPanY) / caseboardZoom;
+        
+        // Adjust pan to keep mouse position stable
+        caseboardPanX += (worldXAfter - worldXBefore) * caseboardZoom;
+        caseboardPanY += (worldYAfter - worldYBefore) * caseboardZoom;
+        
+        UpdateCaseboardTransforms();
+        
+        char buffer[128];
+        sprintf_s(buffer, "Caseboard zoom: %.2f, pan: (%.1f, %.1f)\n", 
+                  caseboardZoom, caseboardPanX, caseboardPanY);
+        OutputDebugStringA(buffer);
+    }
+    
+    // Handle caseboard pan start (mouse down)
+    void CaseboardPanStart(int x, int y) {
+        if (!inCaseboardMode)
+            return;
+        
+        caseboardPanning = true;
+        caseboardLastMousePos.x = x;
+        caseboardLastMousePos.y = y;
+    }
+    
+    // Handle caseboard pan end (mouse up)
+    void CaseboardPanEnd() {
+        caseboardPanning = false;
+    }
+    
+    // Handle caseboard pan move (mouse move while dragging)
+    void CaseboardPanMove(int x, int y) {
+        if (!inCaseboardMode || !caseboardPanning)
+            return;
+        
+        float deltaX = (float)(x - caseboardLastMousePos.x);
+        float deltaY = (float)(y - caseboardLastMousePos.y);
+        
+        caseboardPanX += deltaX;
+        caseboardPanY += deltaY;
+        
+        caseboardLastMousePos.x = x;
+        caseboardLastMousePos.y = y;
+        
+        UpdateCaseboardTransforms();
+    }
 
     // Config file management
     std::string GetConfigFilePath() {
@@ -898,6 +1242,37 @@ class NoesisRenderPath : public wi::RenderPath3D {
         // Call parent Update first
         RenderPath3D::Update(dt);
 
+        // Handle dialogue mode input
+        if (inDialogueMode) {
+            // Escape key - exit dialogue mode
+            static bool escWasPressedDialogue = false;
+            bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+            if (escPressed && !escWasPressedDialogue) {
+                ExitDialogueMode();
+            }
+            escWasPressedDialogue = escPressed;
+
+            // Skip walkabout controls while in dialogue
+            return;
+        }
+        
+        // Handle caseboard mode input
+        if (inCaseboardMode) {
+            // Escape or C key - exit caseboard mode
+            static bool escWasPressedCaseboard = false;
+            static bool cWasPressedCaseboard = false;
+            bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+            bool cPressed = (GetAsyncKeyState('C') & 0x8000) != 0;
+            if ((escPressed && !escWasPressedCaseboard) || (cPressed && !cWasPressedCaseboard)) {
+                ExitCaseboardMode();
+            }
+            escWasPressedCaseboard = escPressed;
+            cWasPressedCaseboard = cPressed;
+
+            // Skip walkabout controls while in caseboard
+            return;
+        }
+
         // Handle walkabout-style controls and third-person camera when game is active
         if (!menuVisible && playerCharacter != wi::ecs::INVALID_ENTITY) {
             wi::scene::Scene &scene = wi::scene::GetScene();
@@ -1091,6 +1466,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 wi::renderer::DrawLine(debugLine);
 
                 // Check if we hit an NPC
+                aimedNPCEntity = wi::ecs::INVALID_ENTITY;
                 if (aimHit.entity != wi::ecs::INVALID_ENTITY) {
                     // Check if hit entity or any ancestor is an NPC
                     wi::ecs::Entity checkEntity = aimHit.entity;
@@ -1101,6 +1477,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                             scene.minds.GetComponent(checkEntity);
                         if (mind != nullptr && mind->IsNPC()) {
                             aimingAtNPC = true;
+                            aimedNPCEntity = checkEntity; // Store the NPC entity
                             break;
                         }
                         // Check parent via hierarchy
@@ -1114,11 +1491,28 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     }
                 }
 
+                // T key - enter dialogue mode when aiming at NPC
+                static bool tWasPressed = false;
+                bool tPressed = (GetAsyncKeyState('T') & 0x8000) != 0;
+                if (tPressed && !tWasPressed && aimingAtNPC &&
+                    aimedNPCEntity != wi::ecs::INVALID_ENTITY) {
+                    EnterDialogueMode(aimedNPCEntity);
+                }
+                tWasPressed = tPressed;
+                
+                // C key - toggle caseboard mode
+                static bool cWasPressed = false;
+                bool cPressed = (GetAsyncKeyState('C') & 0x8000) != 0;
+                if (cPressed && !cWasPressed) {
+                    EnterCaseboardMode();
+                }
+                cWasPressed = cPressed;
+
                 // Update Noesis Talk indicator visibility (only during gameplay)
                 if (talkIndicator) {
-                    talkIndicator->SetVisibility(
-                        (!menuVisible && aimingAtNPC) ? Noesis::Visibility_Visible
-                                                      : Noesis::Visibility_Collapsed);
+                    talkIndicator->SetVisibility((!menuVisible && aimingAtNPC)
+                                                     ? Noesis::Visibility_Visible
+                                                     : Noesis::Visibility_Collapsed);
                 }
             }
 
@@ -1221,7 +1615,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 params.corners_rounding[3] = {2.0f, 8}; // Bottom-right
                 wi::image::Draw(nullptr, params, cmd);
             }
-
         }
 
         // Render Noesis UI on top of everything
@@ -1263,6 +1656,13 @@ class NoesisRenderPath : public wi::RenderPath3D {
     bool MouseWheel(int x, int y, int delta) {
         if (!uiView)
             return false;
+        
+        // Handle caseboard zoom
+        if (inCaseboardMode) {
+            CaseboardZoom(x, y, (float)delta);
+            return true;
+        }
+        
         // Forward to Noesis
         return uiView->MouseWheel(x, y, delta);
     }
@@ -1331,6 +1731,30 @@ class NoesisRenderPath : public wi::RenderPath3D {
         playGameButton = FindElementByName<Noesis::Button>(rootGrid, "PlayGameButton");
         fullscreenButton = FindElementByName<Noesis::Button>(rootGrid, "FullscreenButton");
         talkIndicator = FindElementByName<Noesis::FrameworkElement>(rootGrid, "TalkIndicator");
+
+        // Find dialogue panel UI elements
+        dialoguePanelRoot = FindElementByName<Noesis::Grid>(rootGrid, "DialoguePanelRoot");
+        dialogueScrollViewer =
+            FindElementByName<Noesis::ScrollViewer>(rootGrid, "DialogueScrollViewer");
+        dialogueList = FindElementByName<Noesis::StackPanel>(rootGrid, "DialogueList");
+        dialogueInput = FindElementByName<Noesis::TextBox>(rootGrid, "DialogueInput");
+        dialogueHintText = FindElementByName<Noesis::TextBlock>(rootGrid, "DialogueHintText");
+        
+        // Find caseboard panel UI elements
+        caseboardPanel = FindElementByName<Noesis::Grid>(rootGrid, "CaseboardPanel");
+        
+        // Find the CaseboardContent canvas and get its transforms
+        Noesis::Ptr<Noesis::Panel> caseboardContent = FindElementByName<Noesis::Panel>(rootGrid, "CaseboardContent");
+        if (caseboardContent) {
+            Noesis::Transform* transform = caseboardContent->GetRenderTransform();
+            if (transform) {
+                Noesis::TransformGroup* transformGroup = Noesis::DynamicCast<Noesis::TransformGroup*>(transform);
+                if (transformGroup && transformGroup->GetNumChildren() >= 2) {
+                    caseboardZoomTransform = Noesis::DynamicCast<Noesis::ScaleTransform*>(transformGroup->GetChild(0));
+                    caseboardPanTransform = Noesis::DynamicCast<Noesis::TranslateTransform*>(transformGroup->GetChild(1));
+                }
+            }
+        }
 
         // Wire up event handlers
         if (playGameButton) {
@@ -1437,6 +1861,14 @@ class NoesisRenderPath : public wi::RenderPath3D {
         fullscreenButton.Reset();
         menuContainer.Reset();
         talkIndicator.Reset();
+        dialoguePanelRoot.Reset();
+        dialogueScrollViewer.Reset();
+        dialogueList.Reset();
+        dialogueInput.Reset();
+        dialogueHintText.Reset();
+        caseboardPanel.Reset();
+        caseboardZoomTransform = nullptr;
+        caseboardPanTransform = nullptr;
         rootElement.Reset();
 
         if (frameFence) {

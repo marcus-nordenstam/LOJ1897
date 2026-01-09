@@ -221,8 +221,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                 application.SetWindow(hWnd);
             break;
         case WM_CHAR:
-            // Forward to Noesis first if available
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView()) {
+            // Forward to Noesis first if available (menu, dialogue, or caseboard mode)
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && 
+                (g_noesisRenderPath->IsMenuVisible() || g_noesisRenderPath->IsDialogueModeActive() || g_noesisRenderPath->IsCaseboardModeActive())) {
                 // Forward character input to Noesis for text boxes
                 uint32_t character = (uint32_t)wParam;
                 // Filter out control characters except tab, newline, and carriage return
@@ -245,23 +246,38 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
             break;
         case WM_LBUTTONDOWN:
-            // Only forward mouse to Noesis when menu is visible
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
+            // Forward mouse to Noesis when menu is visible, dialogue, or caseboard mode
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && 
+                (g_noesisRenderPath->IsMenuVisible() || g_noesisRenderPath->IsDialogueModeActive() || g_noesisRenderPath->IsCaseboardModeActive())) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
+                
+                // Handle caseboard panning
+                if (g_noesisRenderPath->IsCaseboardModeActive()) {
+                    g_noesisRenderPath->CaseboardPanStart(x, y);
+                }
+                
                 g_noesisRenderPath->GetNoesisView()->MouseButtonDown(x, y,
                                                                      Noesis::MouseButton_Left);
             }
             break;
         case WM_LBUTTONUP:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && 
+                (g_noesisRenderPath->IsMenuVisible() || g_noesisRenderPath->IsDialogueModeActive() || g_noesisRenderPath->IsCaseboardModeActive())) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
+                
+                // Handle caseboard panning end
+                if (g_noesisRenderPath->IsCaseboardModeActive()) {
+                    g_noesisRenderPath->CaseboardPanEnd();
+                }
+                
                 g_noesisRenderPath->GetNoesisView()->MouseButtonUp(x, y, Noesis::MouseButton_Left);
             }
             break;
         case WM_RBUTTONDOWN:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && 
+                (g_noesisRenderPath->IsMenuVisible() || g_noesisRenderPath->IsDialogueModeActive() || g_noesisRenderPath->IsCaseboardModeActive())) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 g_noesisRenderPath->GetNoesisView()->MouseButtonDown(x, y,
@@ -269,7 +285,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
             break;
         case WM_RBUTTONUP:
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && 
+                (g_noesisRenderPath->IsMenuVisible() || g_noesisRenderPath->IsDialogueModeActive() || g_noesisRenderPath->IsCaseboardModeActive())) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
                 g_noesisRenderPath->GetNoesisView()->MouseButtonUp(x, y, Noesis::MouseButton_Right);
@@ -277,10 +294,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             break;
         case WM_MOUSEMOVE:
             trackMouse(hWnd);
-            // Only forward mouse to Noesis when menu is visible
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
+            // Forward mouse to Noesis when menu is visible, dialogue, or caseboard mode
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && 
+                (g_noesisRenderPath->IsMenuVisible() || g_noesisRenderPath->IsDialogueModeActive() || g_noesisRenderPath->IsCaseboardModeActive())) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
+                
+                // Handle caseboard panning
+                if (g_noesisRenderPath->IsCaseboardModeActive()) {
+                    g_noesisRenderPath->CaseboardPanMove(x, y);
+                }
+                
                 g_noesisRenderPath->GetNoesisView()->MouseMove(x, y);
             }
             break;
@@ -298,17 +322,24 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             }
         } break;
         case WM_KEYDOWN:
-            // Only forward keyboard to Noesis when menu is visible
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
+            // Forward keyboard to Noesis when menu is visible, dialogue, or caseboard mode
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && 
+                (g_noesisRenderPath->IsMenuVisible() || g_noesisRenderPath->IsDialogueModeActive() || g_noesisRenderPath->IsCaseboardModeActive())) {
                 Noesis::Key key = ConvertWin32KeyToNoesis((int)wParam);
                 if (key != Noesis::Key_None) {
                     g_noesisRenderPath->GetNoesisView()->KeyDown(key);
                 }
+                
+                // Handle Enter key for dialogue submission
+                if (g_noesisRenderPath->IsDialogueModeActive() && key == Noesis::Key_Return) {
+                    g_noesisRenderPath->OnDialogueInputCommitted();
+                }
             }
             break;
         case WM_KEYUP:
-            // Only forward keyboard to Noesis when menu is visible
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && g_noesisRenderPath->IsMenuVisible()) {
+            // Forward keyboard to Noesis when menu is visible, dialogue, or caseboard mode
+            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() && 
+                (g_noesisRenderPath->IsMenuVisible() || g_noesisRenderPath->IsDialogueModeActive() || g_noesisRenderPath->IsCaseboardModeActive())) {
                 Noesis::Key key = ConvertWin32KeyToNoesis((int)wParam);
                 if (key != Noesis::Key_None) {
                     g_noesisRenderPath->GetNoesisView()->KeyUp(key);

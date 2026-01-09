@@ -164,4 +164,242 @@
         </TextBlock>
     </StackPanel>
 
+    <!-- Dialogue Panel (shown when talking to NPC) -->
+    <Grid x:Name="DialoguePanelRoot"
+          HorizontalAlignment="Right"
+          VerticalAlignment="Stretch"
+          Margin="0,50,50,50"
+          Width="600"
+          Visibility="Collapsed">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Main dialogue area with dark background -->
+        <Grid Grid.Row="0">
+            <!-- Dark semi-transparent background -->
+            <Border Background="#CC000000" CornerRadius="4"/>
+            
+            <!-- Content overlay -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Dialogue history (scrollable, content at bottom) -->
+                <ScrollViewer x:Name="DialogueScrollViewer"
+                              Grid.Row="0"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+                        <StackPanel x:Name="DialogueList" VerticalAlignment="Bottom"/>
+                    </Grid>
+                </ScrollViewer>
+                
+                <!-- Input area -->
+                <TextBox x:Name="DialogueInput"
+                         Grid.Row="1"
+                         Background="#FF1A1A1A"
+                         Foreground="#FFD4C4A0"
+                         BorderThickness="0,1,0,0"
+                         BorderBrush="#FF4A4A4A"
+                         FontFamily="Theme/Fonts/#PT Root UI"
+                         FontSize="16"
+                         Padding="14,10,14,10"
+                         CaretBrush="#FFD4C4A0"/>
+            </Grid>
+        </Grid>
+
+        <!-- Hint text area (below the panel) -->
+        <TextBlock x:Name="DialogueHintText"
+                   Grid.Row="1"
+                   FontFamily="Verdana"
+                   FontSize="16"
+                   Foreground="#FFFFFF00"
+                   Margin="0,14,0,0"
+                   Visibility="Collapsed"/>
+
+    </Grid>
+
+    <!-- Caseboard Panel (shown when C is pressed during gameplay) -->
+    <Grid x:Name="CaseboardPanel"
+          HorizontalAlignment="Stretch"
+          VerticalAlignment="Stretch"
+          Visibility="Collapsed"
+          ClipToBounds="True">
+        
+        <!-- Dark fabric background (fixed, doesn't pan/zoom) -->
+        <Border Background="#FF0A1520"/>
+        
+        <!-- Fabric texture overlay (subtle pattern, fixed) -->
+        <Border>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#FF0A1822" Offset="0"/>
+                    <GradientStop Color="#FF0D1E2A" Offset="0.5"/>
+                    <GradientStop Color="#FF081418" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+        
+        <!-- Pannable/Zoomable Content Container -->
+        <Canvas x:Name="CaseboardContent" ClipToBounds="False">
+            <!-- Transform for pan and zoom -->
+            <Canvas.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="CaseboardZoomTransform" ScaleX="1" ScaleY="1"/>
+                    <TranslateTransform x:Name="CaseboardPanTransform" X="0" Y="0"/>
+                </TransformGroup>
+            </Canvas.RenderTransform>
+            
+            <!-- Title (positioned in board space) -->
+            <TextBlock Canvas.Left="700" Canvas.Top="200"
+                       Text="MURDER CARDS"
+                       FontSize="42"
+                       FontWeight="Bold"
+                       Foreground="#FF4A2020"
+                       FontFamily="Theme/Fonts/#PT Root UI">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="3" Opacity="0.5"/>
+                </TextBlock.Effect>
+            </TextBlock>
+        
+            <!-- Case Cards Container (positioned in board space) -->
+            <StackPanel x:Name="CaseCardsContainer"
+                        Canvas.Left="200" Canvas.Top="300"
+                        Orientation="Horizontal">
+            
+            <!-- Case Card: VICTIM -->
+            <Border x:Name="CaseCard_Victim"
+                    Width="180" Height="240"
+                    Margin="15"
+                    Background="#FF1A1A1A"
+                    BorderBrush="#FF333333"
+                    BorderThickness="2"
+                    CornerRadius="4">
+                <Grid>
+                    <TextBlock Text="VICTIM"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF666666"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontFamily="Theme/Fonts/#PT Root UI"/>
+                </Grid>
+            </Border>
+            
+            <!-- Case Card: CAUSE OF DEATH -->
+            <Border x:Name="CaseCard_CauseOfDeath"
+                    Width="180" Height="240"
+                    Margin="15"
+                    Background="#FF1A1A1A"
+                    BorderBrush="#FF333333"
+                    BorderThickness="2"
+                    CornerRadius="4">
+                <Grid>
+                    <TextBlock Text="CAUSE OF&#x0a;DEATH"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF666666"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               FontFamily="Theme/Fonts/#PT Root UI"/>
+                </Grid>
+            </Border>
+            
+            <!-- Case Card: TIME & PLACE -->
+            <Border x:Name="CaseCard_TimePlace"
+                    Width="180" Height="240"
+                    Margin="15"
+                    Background="#FF1A1A1A"
+                    BorderBrush="#FF333333"
+                    BorderThickness="2"
+                    CornerRadius="4">
+                <Grid>
+                    <TextBlock Text="TIME &amp;&#x0a;PLACE"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF666666"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               FontFamily="Theme/Fonts/#PT Root UI"/>
+                </Grid>
+            </Border>
+            
+            <!-- Case Card: MEANS -->
+            <Border x:Name="CaseCard_Means"
+                    Width="180" Height="240"
+                    Margin="15"
+                    Background="#FF1A1A1A"
+                    BorderBrush="#FF333333"
+                    BorderThickness="2"
+                    CornerRadius="4">
+                <Grid>
+                    <TextBlock Text="MEANS"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF666666"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontFamily="Theme/Fonts/#PT Root UI"/>
+                </Grid>
+            </Border>
+            
+            <!-- Case Card: MOTIVE -->
+            <Border x:Name="CaseCard_Motive"
+                    Width="180" Height="240"
+                    Margin="15"
+                    Background="#FF1A1A1A"
+                    BorderBrush="#FF333333"
+                    BorderThickness="2"
+                    CornerRadius="4">
+                <Grid>
+                    <TextBlock Text="MOTIVE"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF666666"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontFamily="Theme/Fonts/#PT Root UI"/>
+                </Grid>
+            </Border>
+            
+            <!-- Case Card: SUSPECT -->
+            <Border x:Name="CaseCard_Suspect"
+                    Width="180" Height="240"
+                    Margin="15"
+                    Background="#FF1A1A1A"
+                    BorderBrush="#FF333333"
+                    BorderThickness="2"
+                    CornerRadius="4">
+                <Grid>
+                    <TextBlock Text="SUSPECT"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF666666"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontFamily="Theme/Fonts/#PT Root UI"/>
+                </Grid>
+            </Border>
+            
+            </StackPanel>
+        </Canvas>
+        
+        <!-- HUD hint at bottom (fixed, doesn't pan/zoom) -->
+        <TextBlock Text="[C] Close Caseboard    [N] Add Note    [Scroll] Zoom    [Drag] Pan"
+                   FontSize="16"
+                   Foreground="#FFFFFF00"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,0,30"
+                   FontFamily="Verdana"/>
+        
+    </Grid>
+
 </Grid>
