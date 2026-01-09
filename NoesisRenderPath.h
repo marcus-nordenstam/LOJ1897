@@ -116,7 +116,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     wi::audio::SoundInstance menuMusicInstance;
 
     // UI state
-    bool menuVisible = true;
+    bool inMainMenuMode = true;
 
     // Player character tracking
     wi::ecs::Entity playerCharacter = wi::ecs::INVALID_ENTITY;
@@ -143,7 +143,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     // Caseboard mode state
     bool inCaseboardMode = false;
-    bool caseboardJustEntered = false; // Flag to skip first frame after entering
 
     // Caseboard pan/zoom state
     float caseboardZoom = 1.0f;
@@ -179,7 +178,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     Noesis::IView *GetNoesisView() const { return uiView; }
 
     // Check if menu is visible (for input routing)
-    bool IsMenuVisible() const { return menuVisible; }
+    bool IsMenuVisible() const { return inMainMenuMode; }
 
     // Check if dialogue mode is active
     bool IsDialogueModeActive() const { return inDialogueMode; }
@@ -358,7 +357,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
             return;
 
         inCaseboardMode = true;
-        caseboardJustEntered = true; // Skip first frame to avoid immediate exit
         caseboardPanning = false;
 
         // Calculate visible area dimensions based on window aspect ratio
@@ -553,7 +551,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 }
             }
         }
-        
+
         // Check if clicking on a note card's drag area (outside text area)
         int dragCardIndex = HitTestNoteCardDragArea(boardClickX, boardClickY);
         if (dragCardIndex >= 0) {
@@ -567,7 +565,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     }
 
     // Handle caseboard pan end (mouse up)
-    void CaseboardPanEnd() { 
+    void CaseboardPanEnd() {
         caseboardPanning = false;
         StopDraggingNoteCard();
     }
@@ -616,11 +614,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
         // Always update current mouse pos for debug display
         caseboardCurrentMousePos.x = x;
         caseboardCurrentMousePos.y = y;
-        
+
         // Convert to board space for drag/hover detection
         float boardX = (x - caseboardPanX) / caseboardZoom;
         float boardY = (y - caseboardPanY) / caseboardZoom;
-        
+
         // Handle note card dragging
         if (IsDraggingNoteCard()) {
             UpdateDraggingNoteCard(boardX, boardY);
@@ -648,7 +646,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
             if (hoverCardIndex >= 0 && windowHandle) {
                 SetCursor(LoadCursor(NULL, IDC_HAND));
             }
-            
+
             // Just update debug text when not panning
             UpdateCaseboardDebugText();
         }
@@ -846,31 +844,31 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
         OutputDebugStringA("Started editing existing note card\n");
     }
-    
+
     // Check if a board position is on a note card's draggable area (not the text area)
     // Returns the index of the note card, or -1 if not on any
     int HitTestNoteCardDragArea(float boardX, float boardY) {
-        for (int i = (int)noteCards.size() - 1; i >= 0; i--) {  // Check top cards first
-            NoteCard& card = noteCards[i];
-            
+        for (int i = (int)noteCards.size() - 1; i >= 0; i--) { // Check top cards first
+            NoteCard &card = noteCards[i];
+
             // Full card bounds
             float cardLeft = card.boardX - 90.0f;
             float cardTop = card.boardY - 110.0f;
             float cardRight = cardLeft + 180.0f;
             float cardBottom = cardTop + 220.0f;
-            
+
             // Text/editable area bounds
             float textLeft = cardLeft + 15.0f;
             float textTop = cardTop + 20.0f;
             float textRight = cardRight - 15.0f;
             float textBottom = cardBottom - 20.0f;
-            
+
             // Check if inside card
-            if (boardX >= cardLeft && boardX <= cardRight &&
-                boardY >= cardTop && boardY <= cardBottom) {
+            if (boardX >= cardLeft && boardX <= cardRight && boardY >= cardTop &&
+                boardY <= cardBottom) {
                 // Check if NOT in text area (draggable area is outside text area)
-                bool inTextArea = (boardX >= textLeft && boardX <= textRight &&
-                                   boardY >= textTop && boardY <= textBottom);
+                bool inTextArea = (boardX >= textLeft && boardX <= textRight && boardY >= textTop &&
+                                   boardY <= textBottom);
                 if (!inTextArea) {
                     return i;
                 }
@@ -878,45 +876,45 @@ class NoesisRenderPath : public wi::RenderPath3D {
         }
         return -1;
     }
-    
+
     // Start dragging a note card
     void StartDraggingNoteCard(int index, float boardX, float boardY) {
         if (index < 0 || index >= (int)noteCards.size())
             return;
-        
+
         // If editing this card, finalize first
         if (editingNoteCardIndex == index) {
             FinalizeNoteCardEdit();
         }
-        
+
         draggingNoteCardIndex = index;
-        NoteCard& card = noteCards[index];
-        
+        NoteCard &card = noteCards[index];
+
         // Store offset from card center to mouse position
         dragOffsetX = boardX - card.boardX;
         dragOffsetY = boardY - card.boardY;
-        
+
         OutputDebugStringA("Started dragging note card\n");
     }
-    
+
     // Update dragged note card position
     void UpdateDraggingNoteCard(float boardX, float boardY) {
         if (draggingNoteCardIndex < 0 || draggingNoteCardIndex >= (int)noteCards.size())
             return;
-        
-        NoteCard& card = noteCards[draggingNoteCardIndex];
-        
+
+        NoteCard &card = noteCards[draggingNoteCardIndex];
+
         // Update position (accounting for drag offset)
         card.boardX = boardX - dragOffsetX;
         card.boardY = boardY - dragOffsetY;
-        
+
         // Update the canvas position
         if (card.container) {
             Noesis::Canvas::SetLeft(card.container, card.boardX - 90.0f);
             Noesis::Canvas::SetTop(card.container, card.boardY - 110.0f);
         }
     }
-    
+
     // Stop dragging
     void StopDraggingNoteCard() {
         if (draggingNoteCardIndex >= 0) {
@@ -924,10 +922,74 @@ class NoesisRenderPath : public wi::RenderPath3D {
         }
         draggingNoteCardIndex = -1;
     }
-    
+
     // Check if currently dragging a note card
-    bool IsDraggingNoteCard() const {
-        return draggingNoteCardIndex >= 0;
+    bool IsDraggingNoteCard() const { return draggingNoteCardIndex >= 0; }
+
+    // Try to handle a shortcut key BEFORE sending to Noesis
+    // Returns true if we handled it (caller should NOT send to Noesis)
+    // Returns false if we didn't handle it (caller should send to Noesis)
+    bool TryHandleShortcut(Noesis::Key key) {
+        // Ignore unkonown keys
+        if (key == Noesis::Key_None)
+            return false;
+
+        if (inMainMenuMode) {
+            // Forward to Noesis (for TextBox input, etc.)
+            return GetNoesisView()->KeyDown(key);
+        }
+
+        if (inCaseboardMode) {
+            // If editing, let Noesis handle all keys
+            if (editingNoteCardIndex >= 0) {
+                // Exception: Escape always exits/finalizes
+                if (key == Noesis::Key_Escape) {
+                    FinalizeNoteCardEdit();
+                    return true; // Consumed
+                }
+                // Forward to Noesis (for TextBox input, etc.)
+                return GetNoesisView()->KeyDown(key);
+            }
+
+            // Not editing - handle shortcuts
+            switch (key) {
+            case Noesis::Key_Escape:
+            case Noesis::Key_C:
+                ExitCaseboardMode();
+                return true; // Consumed
+            case Noesis::Key_N:
+                AddNoteCard();
+                return true; // Consumed
+            default:
+                // Forward to Noesis (for TextBox input, etc.)
+                return GetNoesisView()->KeyDown(key);
+            }
+        }
+
+        // Handle dialogue mode shortcuts
+        if (inDialogueMode) {
+            if (key == Noesis::Key_Escape) {
+                ExitDialogueMode();
+                return true; // Consumed
+            }
+            // Forward to Noesis (for TextBox input, etc.)
+            return GetNoesisView()->KeyDown(key);
+        }
+
+        // If we get here, then no GUI mode is active and this is a top-level shortcut -- Noesis is
+        // not involved.
+        switch (key) {
+        case Noesis::Key_T:
+            if (aimedNPCEntity != wi::ecs::INVALID_ENTITY) {
+                EnterDialogueMode(aimedNPCEntity);
+            }
+            return true; // Consumed
+        case Noesis::Key_C:
+            EnterCaseboardMode();
+            return true; // Consumed
+        default:
+            return false; // Not handled
+        }
     }
 
     // Config file management
@@ -1722,55 +1784,20 @@ class NoesisRenderPath : public wi::RenderPath3D {
         // Call parent Update first
         RenderPath3D::Update(dt);
 
-        // Handle dialogue mode input
+        // Skip walkabout controls while in dialogue mode
+        // Key input is handled via HandleKeyDown() called from main.cpp
         if (inDialogueMode) {
-            // Escape key - exit dialogue mode
-            static bool escWasPressedDialogue = false;
-            bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
-            if (escPressed && !escWasPressedDialogue) {
-                ExitDialogueMode();
-            }
-            escWasPressedDialogue = escPressed;
-
-            // Skip walkabout controls while in dialogue
             return;
         }
 
-        // Handle caseboard mode input
+        // Skip walkabout controls while in caseboard mode
+        // Key input is handled via HandleKeyDown() called from main.cpp
         if (inCaseboardMode) {
-            // Skip first frame after entering to avoid immediate exit when C is still held
-            if (caseboardJustEntered) {
-                caseboardJustEntered = false;
-                return;
-            }
-
-            // Escape or C key - exit caseboard mode (C only when not editing)
-            static bool escWasPressedCaseboard = false;
-            static bool cWasPressedCaseboard = false;
-            bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
-            bool cPressed = (GetAsyncKeyState('C') & 0x8000) != 0;
-            bool canExitWithC = (editingNoteCardIndex < 0); // Don't exit with C while editing
-            if ((escPressed && !escWasPressedCaseboard) || 
-                (cPressed && !cWasPressedCaseboard && canExitWithC)) {
-                ExitCaseboardMode();
-            }
-            escWasPressedCaseboard = escPressed;
-            cWasPressedCaseboard = cPressed;
-
-            // N key - add a new note card (only when not editing a note)
-            static bool nWasPressed = false;
-            bool nPressed = (GetAsyncKeyState('N') & 0x8000) != 0;
-            if (nPressed && !nWasPressed && editingNoteCardIndex < 0) {
-                AddNoteCard();
-            }
-            nWasPressed = nPressed;
-
-            // Skip walkabout controls while in caseboard
             return;
         }
 
         // Handle walkabout-style controls and third-person camera when game is active
-        if (!menuVisible && playerCharacter != wi::ecs::INVALID_ENTITY) {
+        if (!inMainMenuMode && playerCharacter != wi::ecs::INVALID_ENTITY) {
             wi::scene::Scene &scene = wi::scene::GetScene();
             wi::scene::CharacterComponent *playerChar =
                 scene.characters.GetComponent(playerCharacter);
@@ -1859,7 +1886,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
                 if (escPressed && !escWasPressed) {
                     SetFirstPersonMode(false);
-                    menuVisible = true;
+                    inMainMenuMode = true;
                     if (menuContainer) {
                         menuContainer->SetVisibility(Noesis::Visibility_Visible);
                     }
@@ -1987,26 +2014,9 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     }
                 }
 
-                // T key - enter dialogue mode when aiming at NPC
-                static bool tWasPressed = false;
-                bool tPressed = (GetAsyncKeyState('T') & 0x8000) != 0;
-                if (tPressed && !tWasPressed && aimingAtNPC &&
-                    aimedNPCEntity != wi::ecs::INVALID_ENTITY) {
-                    EnterDialogueMode(aimedNPCEntity);
-                }
-                tWasPressed = tPressed;
-
-                // C key - toggle caseboard mode
-                static bool cWasPressed = false;
-                bool cPressed = (GetAsyncKeyState('C') & 0x8000) != 0;
-                if (cPressed && !cWasPressed) {
-                    EnterCaseboardMode();
-                }
-                cWasPressed = cPressed;
-
                 // Update Noesis Talk indicator visibility (only during gameplay)
                 if (talkIndicator) {
-                    talkIndicator->SetVisibility((!menuVisible && aimingAtNPC)
+                    talkIndicator->SetVisibility((!inMainMenuMode && aimingAtNPC)
                                                      ? Noesis::Visibility_Visible
                                                      : Noesis::Visibility_Collapsed);
                 }
@@ -2077,7 +2087,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
         RenderPath3D::Compose(cmd);
 
         // Draw aim dot at raycast hit position
-        if (!menuVisible && aimDotVisible) {
+        if (!inMainMenuMode && aimDotVisible) {
             wi::image::SetCanvas(*this);
 
             // Outer circle: 4px radius, semi-transparent
@@ -2195,8 +2205,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
         Noesis::GUI::SetXamlProvider(Noesis::MakePtr<NoesisApp::LocalXamlProvider>("./GUI"));
 
-        Noesis::GUI::SetFontProvider(
-            Noesis::MakePtr<NoesisApp::LocalFontProvider>("./GUI"));
+        Noesis::GUI::SetFontProvider(Noesis::MakePtr<NoesisApp::LocalFontProvider>("./GUI"));
         const char *fonts[] = {"Noesis/Data/Theme/Fonts/#PT Root UI", "Arial", "Segoe UI Emoji"};
         Noesis::GUI::SetFontFallbacks(fonts, 3);
         Noesis::GUI::SetFontDefaultProperties(14.0f, Noesis::FontWeight_Normal,
@@ -2268,7 +2277,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
                     OutputDebugStringA(buffer);
 
                     // Hide the menu
-                    menuVisible = false;
+                    inMainMenuMode = false;
                     if (menuContainer) {
                         menuContainer->SetVisibility(Noesis::Visibility_Collapsed);
                     }
