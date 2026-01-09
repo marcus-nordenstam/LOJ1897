@@ -926,9 +926,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Check if currently dragging a note card
     bool IsDraggingNoteCard() const { return draggingNoteCardIndex >= 0; }
 
-    // Try to handle a shortcut key BEFORE sending to Noesis
-    // Returns true if we handled it (caller should NOT send to Noesis)
-    // Returns false if we didn't handle it (caller should send to Noesis)
     bool TryHandleShortcut(Noesis::Key key) {
         // Ignore unkonown keys
         if (key == Noesis::Key_None)

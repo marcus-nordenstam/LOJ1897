@@ -211,7 +211,6 @@ void trackMouse(HWND hWnd) {
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                       _In_ LPWSTR lpCmdLine, _In_ int nCmdShow) {
-
     // Win32 window and message loop setup:
     static auto WndProc = [](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) -> LRESULT {
         switch (message) {
@@ -220,31 +219,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             if (application.is_window_active)
                 application.SetWindow(hWnd);
             break;
+        case WM_KEYUP:
+            g_noesisRenderPath->GetNoesisView()->KeyUp(ConvertWin32KeyToNoesis((int)wParam));
+            break;
         case WM_CHAR:
-            // Forward to Noesis first if available (menu, dialogue, or caseboard mode)
-            if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() &&
-                (g_noesisRenderPath->IsMenuVisible() ||
-                 g_noesisRenderPath->IsDialogueModeActive() ||
-                 g_noesisRenderPath->IsCaseboardModeActive())) {
-                // Forward character input to Noesis for text boxes
-                uint32_t character = (uint32_t)wParam;
-                // Filter out control characters except tab, newline, and carriage return
-                if (character >= 32 || character == 9 || character == 10 || character == 13) {
-                    g_noesisRenderPath->GetNoesisView()->Char(character);
-                }
-            }
-            // Also forward to Wicked Engine GUI
-            switch (wParam) {
-            case VK_BACK:
-                wi::gui::TextInputField::DeleteFromInput();
-                break;
-            case VK_RETURN:
-                break;
-            default: {
-                const wchar_t c = (const wchar_t)wParam;
-                wi::gui::TextInputField::AddInput(c);
-                break;
-            }
+            //  Filter out control characters except tab, newline, and carriage return
+            if (wParam >= 32 || wParam == 9 || wParam == 10 || wParam == 13) {
+                g_noesisRenderPath->GetNoesisView()->Char(wParam);
             }
             break;
         case WM_LBUTTONDOWN:
@@ -333,15 +314,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                 g_noesisRenderPath->MouseWheel(pt.x, pt.y, delta);
             }
         } break;
-        case WM_KEYDOWN:
-            g_noesisRenderPath->TryHandleShortcut(ConvertWin32KeyToNoesis((int)wParam));
-            break;
-        case WM_KEYUP:
-            g_noesisRenderPath->GetNoesisView()->KeyUp(ConvertWin32KeyToNoesis((int)wParam));
-            break;
-        case WM_INPUT:
-            wi::input::rawinput::ParseMessage((void *)lParam);
-            break;
         case WM_KILLFOCUS:
             application.is_window_active = false;
             break;
@@ -480,8 +452,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     MSG msg = {0};
     while (msg.message != WM_QUIT) {
         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            bool shortcut_handled = false;
+            if (msg.message == WM_KEYDOWN) {
+                if ((msg.lParam & 0x40000000) == 0) { // Not repeated
+                    shortcut_handled = g_noesisRenderPath->TryHandleShortcut(
+                        ConvertWin32KeyToNoesis((int)msg.wParam));
+                }
+            }
+            if (!shortcut_handled) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
         } else {
             application.Run();
         }
