@@ -1784,20 +1784,13 @@ class NoesisRenderPath : public wi::RenderPath3D {
         // Call parent Update first
         RenderPath3D::Update(dt);
 
-        // Skip walkabout controls while in dialogue mode
-        // Key input is handled via HandleKeyDown() called from main.cpp
-        if (inDialogueMode) {
-            return;
-        }
-
-        // Skip walkabout controls while in caseboard mode
-        // Key input is handled via HandleKeyDown() called from main.cpp
-        if (inCaseboardMode) {
+        // Skip walkabout controls while in GUI mode
+        if (inDialogueMode | inCaseboardMode | inMainMenuMode) {
             return;
         }
 
         // Handle walkabout-style controls and third-person camera when game is active
-        if (!inMainMenuMode && playerCharacter != wi::ecs::INVALID_ENTITY) {
+        if (playerCharacter != wi::ecs::INVALID_ENTITY) {
             wi::scene::Scene &scene = wi::scene::GetScene();
             wi::scene::CharacterComponent *playerChar =
                 scene.characters.GetComponent(playerCharacter);
