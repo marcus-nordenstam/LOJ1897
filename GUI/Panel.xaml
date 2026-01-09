@@ -231,9 +231,6 @@
           Visibility="Collapsed"
           ClipToBounds="True">
         
-        <!-- Caseboard background image (fixed, doesn't pan/zoom) -->
-        <Image Source="CaseboardBackground.png" Stretch="UniformToFill"/>
-        
         <!-- Pannable/Zoomable Content Container -->
         <Canvas x:Name="CaseboardContent" ClipToBounds="False">
             <!-- Transform for pan and zoom -->
@@ -243,6 +240,18 @@
                     <TranslateTransform x:Name="CaseboardPanTransform" X="0" Y="0"/>
                 </TransformGroup>
             </Canvas.RenderTransform>
+            
+            <!-- Tiled background (moves with pan/zoom) -->
+            <Rectangle Canvas.Left="-2000" Canvas.Top="-2000" 
+                       Width="6000" Height="6000">
+                <Rectangle.Fill>
+                    <ImageBrush ImageSource="CaseboardBackground.png" 
+                                TileMode="Tile"
+                                Viewport="0,0,438,358"
+                                ViewportUnits="Absolute"
+                                Stretch="None"/>
+                </Rectangle.Fill>
+            </Rectangle>
         
             <!-- Case Cards Container (positioned in board space) -->
             <StackPanel x:Name="CaseCardsContainer"
