@@ -286,7 +286,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
         // Set font family
         Noesis::Ptr<Noesis::FontFamily> fontFamily =
-            Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI");
+            Noesis::MakePtr<Noesis::FontFamily>("Noesis/Data/Theme/Fonts/#PT Root UI");
         textBlock->SetFontFamily(fontFamily);
 
         // Set color based on speaker (player = cream, NPC = light blue)
@@ -660,9 +660,9 @@ class NoesisRenderPath : public wi::RenderPath3D {
         textBox->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
         textBox->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
         textBox->SetMargin(
-            Noesis::Thickness(15.0f, 40.0f, 15.0f, 20.0f)); // Padding for note paper lines
-        textBox->SetFontSize(14.0f);
-        textBox->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI"));
+            Noesis::Thickness(15.0f, 20.0f, 15.0f, 20.0f)); // Padding for note paper lines
+        textBox->SetFontSize(16.0f);
+        textBox->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Old Man Eloquent"));
 
         // Dark blue ink color for note text
         Noesis::Ptr<Noesis::SolidColorBrush> inkBrush =
@@ -730,10 +730,10 @@ class NoesisRenderPath : public wi::RenderPath3D {
         textLabel->SetTextWrapping(Noesis::TextWrapping_Wrap);
         textLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
         textLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Left);
-        // Adjusted margins to match TextBox internal padding (-2px X, -4px Y from current)
-        textLabel->SetMargin(Noesis::Thickness(27.0f, 48.0f, 15.0f, 20.0f));
-        textLabel->SetFontSize(14.0f);
-        textLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI"));
+        // Adjusted margins to match TextBox internal padding
+        textLabel->SetMargin(Noesis::Thickness(27.0f, 28.0f, 15.0f, 20.0f));
+        textLabel->SetFontSize(16.0f);
+        textLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Old Man Eloquent"));
         textLabel->SetFontWeight(Noesis::FontWeight_Normal);
 
         // Dark blue ink color
@@ -788,9 +788,9 @@ class NoesisRenderPath : public wi::RenderPath3D {
         textBox->SetAcceptsReturn(true);
         textBox->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
         textBox->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
-        textBox->SetMargin(Noesis::Thickness(15.0f, 40.0f, 15.0f, 20.0f));
-        textBox->SetFontSize(14.0f);
-        textBox->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Theme/Fonts/#PT Root UI"));
+        textBox->SetMargin(Noesis::Thickness(15.0f, 20.0f, 15.0f, 20.0f));
+        textBox->SetFontSize(16.0f);
+        textBox->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Old Man Eloquent"));
 
         // Dark blue ink color
         Noesis::Ptr<Noesis::SolidColorBrush> inkBrush =
@@ -1631,21 +1631,23 @@ class NoesisRenderPath : public wi::RenderPath3D {
                 return;
             }
 
-            // Escape or C key - exit caseboard mode
+            // Escape or C key - exit caseboard mode (C only when not editing)
             static bool escWasPressedCaseboard = false;
             static bool cWasPressedCaseboard = false;
             bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
             bool cPressed = (GetAsyncKeyState('C') & 0x8000) != 0;
-            if ((escPressed && !escWasPressedCaseboard) || (cPressed && !cWasPressedCaseboard)) {
+            bool canExitWithC = (editingNoteCardIndex < 0); // Don't exit with C while editing
+            if ((escPressed && !escWasPressedCaseboard) || 
+                (cPressed && !cWasPressedCaseboard && canExitWithC)) {
                 ExitCaseboardMode();
             }
             escWasPressedCaseboard = escPressed;
             cWasPressedCaseboard = cPressed;
 
-            // N key - add a new note card
+            // N key - add a new note card (only when not editing a note)
             static bool nWasPressed = false;
             bool nPressed = (GetAsyncKeyState('N') & 0x8000) != 0;
-            if (nPressed && !nWasPressed) {
+            if (nPressed && !nWasPressed && editingNoteCardIndex < 0) {
                 AddNoteCard();
             }
             nWasPressed = nPressed;
@@ -2081,8 +2083,8 @@ class NoesisRenderPath : public wi::RenderPath3D {
         Noesis::GUI::SetXamlProvider(Noesis::MakePtr<NoesisApp::LocalXamlProvider>("./GUI"));
 
         Noesis::GUI::SetFontProvider(
-            Noesis::MakePtr<NoesisApp::LocalFontProvider>("./GUI/Noesis/Data/Theme"));
-        const char *fonts[] = {"Fonts/#PT Root UI", "Arial", "Segoe UI Emoji"};
+            Noesis::MakePtr<NoesisApp::LocalFontProvider>("./GUI"));
+        const char *fonts[] = {"Noesis/Data/Theme/Fonts/#PT Root UI", "Arial", "Segoe UI Emoji"};
         Noesis::GUI::SetFontFallbacks(fonts, 3);
         Noesis::GUI::SetFontDefaultProperties(14.0f, Noesis::FontWeight_Normal,
                                               Noesis::FontStretch_Normal, Noesis::FontStyle_Normal);
