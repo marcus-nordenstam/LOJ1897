@@ -58,105 +58,36 @@
 #include <string>
 #include <vector>
 
+// Include the gameplay subsystems
+#include "CameraSystem.h"
+#include "CaseboardSystem.h"
+#include "DialogueSystem.h"
+#include "GameStartup.h"
+
 // Noesis integration for Wicked Engine
 class NoesisRenderPath : public wi::RenderPath3D {
   private:
     Noesis::Ptr<Noesis::RenderDevice> noesisDevice;
     Noesis::Ptr<Noesis::IView> uiView;
-    Noesis::Ptr<Noesis::TextBox> seedTextBox;          // Seed input
-    Noesis::Ptr<Noesis::Button> playGameButton;        // Play game button
-    Noesis::Ptr<Noesis::Button> fullscreenButton;      // Fullscreen toggle button
     Noesis::Ptr<Noesis::FrameworkElement> rootElement; // Root element from XAML
-    Noesis::Ptr<Noesis::Grid> menuContainer;           // Menu container (hidden during gameplay)
-    Noesis::Ptr<Noesis::FrameworkElement>
-        talkIndicator; // Talk indicator (shown when aiming at NPC)
 
-    // Dialogue panel elements
-    Noesis::Ptr<Noesis::Grid> dialoguePanelRoot;            // Main dialogue panel container
-    Noesis::Ptr<Noesis::ScrollViewer> dialogueScrollViewer; // Scrollable dialogue history
-    Noesis::Ptr<Noesis::StackPanel> dialogueList;           // Container for dialogue entries
-    Noesis::Ptr<Noesis::TextBox> dialogueInput;             // Text input for player dialogue
-    Noesis::Ptr<Noesis::TextBlock> dialogueHintText;        // Hint text for "[T] Take Testimony"
-
-    // Caseboard panel elements
-    Noesis::Ptr<Noesis::Grid> caseboardPanel;    // Main caseboard container
-    Noesis::Ptr<Noesis::Panel> caseboardContent; // Pannable content canvas
-    Noesis::ScaleTransform *caseboardZoomTransform =
-        nullptr; // Zoom transform (owned by TransformGroup)
-    Noesis::TranslateTransform *caseboardPanTransform =
-        nullptr;                                       // Pan transform (owned by TransformGroup)
-    Noesis::Ptr<Noesis::TextBlock> caseboardDebugText; // Debug text overlay
-
-    // Camera/Photography panel elements
-    Noesis::Ptr<Noesis::Grid> cameraPanel;                  // Main camera container
-    Noesis::Ptr<Noesis::FrameworkElement> shutterBarTop;    // Top shutter bar
-    Noesis::Ptr<Noesis::FrameworkElement> shutterBarBottom; // Bottom shutter bar
-    Noesis::Ptr<Noesis::TextBlock> cameraPhotoCount;        // Photo counter text
-
-    // Note cards
-    struct NoteCard {
-        Noesis::Ptr<Noesis::Grid> container;      // The note card container
-        Noesis::Ptr<Noesis::TextBox> textBox;     // Editable text (when editing)
-        Noesis::Ptr<Noesis::TextBlock> textLabel; // Display text (when not editing)
-        float boardX = 0.0f;                      // Position in board space
-        float boardY = 0.0f;
-        bool isEditing = false; // Currently being edited
-        std::string savedText;  // The saved note text
-    };
-    std::vector<NoteCard> noteCards;
-    int editingNoteCardIndex = -1;  // Index of note card being edited, -1 if none
-    int draggingNoteCardIndex = -1; // Index of note card being dragged, -1 if none
-    float dragOffsetX = 0.0f;       // Offset from card center to mouse when drag started
-    float dragOffsetY = 0.0f;
-
-    // Photo cards (captured evidence photos)
-    struct PhotoCard {
-        Noesis::Ptr<Noesis::Grid> container;   // The photo card container
-        Noesis::Ptr<Noesis::Image> photoImage; // The captured photo
-        Noesis::Ptr<Noesis::TextBlock> label;  // Photo label
-        float boardX = 0.0f;                   // Position in board space
-        float boardY = 0.0f;
-        std::string labelText; // Label text
-    };
-    std::vector<PhotoCard> photoCards;
-
-    // Captured photo texture storage (to keep textures alive)
-    std::vector<Noesis::Ptr<Noesis::BitmapSource>> capturedPhotoTextures;
+    // Gameplay subsystems
+    DialogueSystem dialogueSystem;
+    CaseboardSystem caseboardSystem;
+    CameraSystem cameraSystem;
+    GameStartup gameStartup;
 
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
 
-    // Saved settings
-    std::string projectPath;
-    std::string themeMusic;
-    std::string levelPath;
-    std::string playerModel;
-    std::string npcModel;
-    std::string animLib;
-    std::string expressionPath;
-
-    // Animation library entities (for retargeting)
-    std::vector<wi::ecs::Entity> animationLibrary;
-
-    // Music playback
-    wi::audio::Sound menuMusic;
-    wi::audio::SoundInstance menuMusicInstance;
-
     // UI state
     bool inMainMenuMode = true;
 
-    // Player character tracking
-    wi::ecs::Entity playerCharacter = wi::ecs::INVALID_ENTITY;
-    std::vector<wi::ecs::Entity> hiddenPlayerObjects; // Objects hidden during camera mode
-    float cameraHorizontal = 0.0f;                    // Camera yaw angle
-    float cameraVertical = 0.3f;                      // Camera pitch angle
-    float cameraDistance = 2.5f;                      // Camera distance from player
-    float cameraHorizontalOffset = 0.25f; // Over-the-shoulder horizontal offset (positive = right)
-
-    // NPC tracking and Lua scripts
-    std::vector<wi::ecs::Entity> npcEntities;
-    bool patrolScriptLoaded = false;
-    bool guardScriptLoaded = false;
+    // Camera tracking (shared between modes)
+    float cameraHorizontal = 0.0f;  // Camera yaw angle
+    float cameraVertical = 0.3f;    // Camera pitch angle
+    float cameraDistance = 2.5f;    // Camera distance from player
+    float cameraHorizontalOffset = 0.25f; // Over-the-shoulder horizontal offset
 
     // Aim dot (reticle) - raycast from character's eye in camera direction
     bool aimDotVisible = false;
@@ -164,47 +95,8 @@ class NoesisRenderPath : public wi::RenderPath3D {
     bool aimingAtNPC = false;                                 // True if aim ray hits an NPC
     wi::ecs::Entity aimedNPCEntity = wi::ecs::INVALID_ENTITY; // The NPC entity being aimed at
 
-    // Dialogue mode state
-    bool inDialogueMode = false;
-    wi::ecs::Entity dialogueNPCEntity = wi::ecs::INVALID_ENTITY; // NPC we're talking to
-    std::string dialogueNPCName = "NPC";                         // Name of NPC for dialogue display
-
-    // Caseboard mode state
-    bool inCaseboardMode = false;
-
-    // Camera/Photography mode state
-    bool inCameraMode = false;
-    int photosTaken = 0;
-
-    // Shutter animation state
-    float shutterAlpha = 0.0f;             // 0 = open, 1 = fully closed
-    bool shutterActive = false;            // Is shutter animating
-    float shutterDuration = 0.15f;         // Total animation time in seconds
-    float shutterTime = 0.0f;              // Internal time accumulator
-    bool photoCapturedThisShutter = false; // Flag to prevent multiple captures
-
-    // Flag to request capture at end of frame (after rendering is complete)
-    bool captureRequestPending = false;
-
-    // Caseboard pan/zoom state
-    float caseboardZoom = 1.0f;
-    float caseboardPanX = 0.0f;
-    float caseboardPanY = 0.0f;
-    bool caseboardPanning = false;
-    POINT caseboardLastMousePos = {};
-    POINT caseboardCurrentMousePos = {}; // Current mouse position (screen space)
-
-    // Caseboard visible/pannable area (symmetric around origin)
-    // This defines the area accessible via panning at any zoom level
-    float caseboardVisibleHalfX = 3000.0f; // Can pan to see -3000 to +3000 horizontally
-    float caseboardVisibleHalfY = 3000.0f; // Adjusted for aspect ratio on enter
-
     // Fullscreen state
     HWND windowHandle = nullptr;
-    bool isFullscreen = false;
-    RECT windowedRect = {};
-    DWORD windowedStyle = 0;
-    DWORD windowedExStyle = 0;
 
     // Walkabout control state (third-person with mouse capture)
     bool isFirstPersonMode = false; // "First person" refers to control style, not camera
@@ -223,196 +115,58 @@ class NoesisRenderPath : public wi::RenderPath3D {
     bool IsMenuVisible() const { return inMainMenuMode; }
 
     // Check if dialogue mode is active
-    bool IsDialogueModeActive() const { return inDialogueMode; }
-
-    void EnterDialogueMode(wi::ecs::Entity npcEntity);
-    void ExitDialogueMode();
-    void ClearDialogue();
-
-    void AddDialogueEntry(const std::string &speaker, const std::string &message);
-
-    // Scroll dialogue to show newest content (at bottom)
-    void ScrollDialogueToBottom();
-
-    // Handle dialogue input submission
-    void OnDialogueInputCommitted();
+    bool IsDialogueModeActive() const { return dialogueSystem.IsActive(); }
 
     // Check if caseboard mode is active
-    bool IsCaseboardModeActive() const { return inCaseboardMode; }
-
-    // Enter caseboard mode
-    void EnterCaseboardMode();
-
-    // Exit caseboard mode
-    void ExitCaseboardMode();
-
-    // Update caseboard transforms based on current pan/zoom state
-    void UpdateCaseboardTransforms();
-
-    // Update caseboard debug text with current mouse position (board space) and zoom
-    void UpdateCaseboardDebugText();
-
-    // Handle caseboard zoom (mouse wheel)
-    void CaseboardZoom(int x, int y, float delta);
-
-    // Handle caseboard pan start (mouse down)
-    void CaseboardPanStart(int x, int y);
-
-    // Handle caseboard pan end (mouse up)
-    void CaseboardPanEnd();
-
-    // Handle caseboard pan move (mouse move while dragging)
-    // Clamp pan values to keep board visible within viewport
-    void ClampCaseboardPan();
-
-    void CaseboardPanMove(int x, int y);
-
-    // Add a note card at the center of the current view
-    void AddNoteCard();
-
-    // Finalize note card editing - save text and replace TextBox with TextBlock
-    void FinalizeNoteCardEdit();
-
-    // Handle click on caseboard - finalize any active note edit
-    void OnCaseboardClick();
-
-    // Start editing an existing note card (replace TextBlock with TextBox)
-    void StartEditingNoteCard(int index);
-
-    // Check if a board position is on a note card's draggable area (not the text area)
-    // Returns the index of the note card, or -1 if not on any
-    int HitTestNoteCardDragArea(float boardX, float boardY);
-
-    // Start dragging a note card
-    void StartDraggingNoteCard(int index, float boardX, float boardY);
-
-    // Update dragged note card position
-    void UpdateDraggingNoteCard(float boardX, float boardY);
-
-    // Stop dragging
-    void StopDraggingNoteCard();
-
-    // Check if currently dragging a note card
-    bool IsDraggingNoteCard() const { return draggingNoteCardIndex >= 0; }
-
-    // ========== CAMERA/PHOTOGRAPHY MODE ==========
+    bool IsCaseboardModeActive() const { return caseboardSystem.IsActive(); }
 
     // Check if camera mode is active
-    bool IsCameraModeActive() const { return inCameraMode; }
+    bool IsCameraModeActive() const { return cameraSystem.IsActive(); }
 
-    // Enter camera mode
+    // Dialogue system forwarding
+    void EnterDialogueMode(wi::ecs::Entity npcEntity);
+    void ExitDialogueMode();
+
+    // Caseboard system forwarding
+    void EnterCaseboardMode();
+    void ExitCaseboardMode();
+    void CaseboardZoom(int x, int y, float delta);
+    void CaseboardPanStart(int x, int y);
+    void CaseboardPanEnd();
+    void CaseboardPanMove(int x, int y);
+    void AddNoteCard();
+
+    // Camera system forwarding
     void EnterCameraMode();
-
-    // Exit camera mode
     void ExitCameraMode();
-
-    // Take a photo (triggers shutter animation)
     void TakePhoto();
-
-    // Capture the current frame to memory (before shutter obscures it)
-    void CaptureFrameToMemory();
-    
-    // Crop raw texture data in native GPU format
-    void CropRawData(const wi::vector<uint8_t>& srcData,
-                     uint32_t srcWidth, uint32_t srcHeight, uint32_t bytesPerPixel,
-                     uint32_t cropX, uint32_t cropY, uint32_t cropWidth, uint32_t cropHeight,
-                     wi::vector<uint8_t>& dstData);
-    
-    // Convert raw GPU texture data to RGBA8 format
-    bool ConvertToRGBA8(const wi::vector<uint8_t>& rawData, 
-                        const wi::graphics::TextureDesc& desc,
-                        uint32_t width, uint32_t height,
-                        std::vector<uint8_t>& rgba8Data);
-    
-    // Downsample RGBA8 data using box filter
-    void DownsampleRGBA8(const std::vector<uint8_t>& srcData,
-                         uint32_t srcWidth, uint32_t srcHeight,
-                         uint32_t downsampleFactor,
-                         std::vector<uint8_t>& dstData,
-                         uint32_t& outWidth, uint32_t& outHeight);
-
-    // Apply sepia filter to pixel data (RGBA format)
-    void ApplySepia(std::vector<uint8_t> &pixels, int width, int height);
-
-    // Add film grain effect to pixel data
-    void AddFilmGrain(std::vector<uint8_t> &pixels, int width, int height);
-
-    // Save processed photo pixels to a PNG file, returns the filename
-    // Save processed pixels to a PNG file
-    bool SaveProcessedPhoto(const std::string &filename, const std::vector<uint8_t> &pixels,
-                            int width, int height);
-
-    // Add a photo card to the caseboard with the image from file
-    void AddPhotoCard(const std::string &photoFilename);
-
-    // Simulate shutter animation (call from Update)
-    void SimulateShutter(float deltaSeconds);
-
-    // Update shutter bar heights based on shutterAlpha
-    void UpdateShutterBars();
-
-    // Update the photo count display
-    void UpdateCameraPhotoCount();
-
-    // Update viewfinder layout based on window size
-    void UpdateViewfinderLayout();
-
-    // Handle mouse click in camera mode
     void CameraClick(int x, int y);
 
+    // Handle keyboard shortcuts
     bool TryHandleShortcut(Noesis::Key key);
 
-    // Config file management
-    std::string GetConfigFilePath();
-
-    void SaveConfig();
-
-    void LoadConfig();
-
-    void InitializeAnimationSystem();
-
-    void UpdateControlStates();
-
-    void LoadAndPlayMenuMusic();
-
-    // Helper to find animation entity by name substring (like walkabout)
-    wi::ecs::Entity FindAnimationByName(const wi::scene::Scene &scene,
-                                        const char *anim_name_substr);
-
-    void SpawnCharactersFromMetadata(wi::scene::Scene &scene);
-
-    wi::ecs::Entity SpawnCharacter(wi::scene::Scene &scene, const std::string &modelPath,
-                                   const XMFLOAT3 &position, const XMFLOAT3 &forward,
-                                   bool isPlayer);
-
-    void LoadNPCScripts();
-
-    void CleanupNPCScripts();
-
-    void LoadGameScene();
-
+    // Third-person mode control
     void SetThirdPersonMode(bool enabled);
 
-    // Enable/disable first-person camera mode (for camera/photography mode)
+    // First-person camera mode (for photography)
     void SetFirstPersonMode(bool enabled);
 
+    // Toggle fullscreen
     void ToggleFullscreen();
 
+    // Config management (forwarded to GameStartup)
+    void SaveConfig() { gameStartup.SaveConfig(); }
+
+    // Override RenderPath3D methods
     void Start() override;
-
     void Stop() override;
-
     void Update(float dt) override;
-
     void PreRender() override;
-
-    // Called after Render() but before Compose() - the render target is now filled
     void PostRender() override;
-
     void Compose(wi::graphics::CommandList cmd) const override;
-
     void ResizeBuffers() override;
 
+    // Mouse wheel handling
     bool MouseWheel(int x, int y, int delta);
 
   private:
@@ -430,9 +184,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
         if (!casted)
             return Noesis::Ptr<T>();
 
-        // Explicitly construct Ptr from raw pointer
-        // Elements from XAML are already managed by the visual tree, so this is a non-owning
-        // reference
         Noesis::Ptr<T> result(casted);
         return result;
     }
