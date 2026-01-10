@@ -209,7 +209,7 @@ void PhotoMode::CaptureFrameToMemory(wi::RenderPath3D *renderPath) {
 
     // Add to caseboard if available
     if (caseboardSystem) {
-        caseboardSystem->AddPhotoCard(photo_filename, photosTaken);
+        caseboardSystem->AddPhotoCard(photo_filename);
     }
 }
 

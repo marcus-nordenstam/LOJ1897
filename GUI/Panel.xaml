@@ -387,21 +387,7 @@
                 <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="2" Opacity="0.8"/>
             </TextBlock.Effect>
         </TextBlock>
-        
-        <!-- Photo counter/info (top-right) -->
-        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,20,20,0">
-            <TextBlock x:Name="CameraPhotoCount"
-                       Text="PHOTOS: 0"
-                       FontSize="14"
-                       FontWeight="Normal"
-                       Foreground="#FFFFCC00"
-                       FontFamily="Consolas">
-                <TextBlock.Effect>
-                    <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
-                </TextBlock.Effect>
-            </TextBlock>
-        </StackPanel>
-        
+
     </Grid>
 
 </Grid>

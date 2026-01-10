@@ -41,6 +41,8 @@ class CaseboardMode {
         float boardX = 0.0f;
         float boardY = 0.0f;
         std::string labelText;
+        float width = 256.0f;
+        float height = 320.0f;
     };
 
     CaseboardMode() = default;
@@ -96,23 +98,39 @@ class CaseboardMode {
     // Returns the index of the note card, or -1 if not on any
     int HitTestNoteCardDragArea(float boardX, float boardY);
 
+    // Check if a board position is on a photo card
+    // Returns the index of the photo card, or -1 if not on any
+    int HitTestPhotoCard(float boardX, float boardY);
+
     // Start dragging a note card
     void StartDraggingNoteCard(int index, float boardX, float boardY);
+
+    // Start dragging a photo card
+    void StartDraggingPhotoCard(int index, float boardX, float boardY);
 
     // Update dragged note card position
     void UpdateDraggingNoteCard(float boardX, float boardY);
 
+    // Update dragged photo card position
+    void UpdateDraggingPhotoCard(float boardX, float boardY);
+
     // Stop dragging
     void StopDraggingNoteCard();
 
+    // Stop dragging photo card
+    void StopDraggingPhotoCard();
+
     // Check if currently dragging a note card
     bool IsDraggingNoteCard() const { return draggingNoteCardIndex >= 0; }
+
+    // Check if currently dragging a photo card
+    bool IsDraggingPhotoCard() const { return draggingPhotoCardIndex >= 0; }
 
     // Check if caseboard mode is active
     bool IsActive() const { return inCaseboardMode; }
 
     // Add a photo card to the caseboard with the image from file
-    void AddPhotoCard(const std::string &photoFilename, int photoNumber);
+    void AddPhotoCard(const std::string &photoFilename);
 
     // Get photo cards (for photo count display)
     const std::vector<PhotoCard> &GetPhotoCards() const { return photoCards; }
@@ -140,6 +158,7 @@ class CaseboardMode {
     // Editing state
     int editingNoteCardIndex = -1;
     int draggingNoteCardIndex = -1;
+    int draggingPhotoCardIndex = -1;
     float dragOffsetX = 0.0f;
     float dragOffsetY = 0.0f;
 

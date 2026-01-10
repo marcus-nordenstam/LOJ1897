@@ -5,6 +5,7 @@
 #include <NsGui/BitmapImage.h>
 #include <NsGui/Border.h>
 #include <NsGui/Canvas.h>
+#include <NsGui/DropShadowEffect.h>
 #include <NsGui/Enums.h>
 #include <NsGui/FontFamily.h>
 #include <NsGui/FontProperties.h>
@@ -237,6 +238,13 @@ void CaseboardMode::CaseboardPanStart(int x, int y) {
         return;
     }
 
+    // Check if clicking on a photo card
+    int dragPhotoIndex = HitTestPhotoCard(boardClickX, boardClickY);
+    if (dragPhotoIndex >= 0) {
+        StartDraggingPhotoCard(dragPhotoIndex, boardClickX, boardClickY);
+        return;
+    }
+
     caseboardPanning = true;
     caseboardLastMousePos.x = x;
     caseboardLastMousePos.y = y;
@@ -245,6 +253,7 @@ void CaseboardMode::CaseboardPanStart(int x, int y) {
 void CaseboardMode::CaseboardPanEnd() {
     caseboardPanning = false;
     StopDraggingNoteCard();
+    StopDraggingPhotoCard();
 }
 
 void CaseboardMode::ClampCaseboardPan() {
@@ -293,6 +302,13 @@ void CaseboardMode::CaseboardPanMove(int x, int y) {
         return;
     }
 
+    // Handle photo card dragging
+    if (IsDraggingPhotoCard()) {
+        UpdateDraggingPhotoCard(boardX, boardY);
+        UpdateCaseboardDebugText();
+        return;
+    }
+
     if (caseboardPanning) {
         float deltaX = (float)(x - caseboardLastMousePos.x);
         float deltaY = (float)(y - caseboardLastMousePos.y);
@@ -307,9 +323,10 @@ void CaseboardMode::CaseboardPanMove(int x, int y) {
 
         UpdateCaseboardTransforms();
     } else {
-        // Check if hovering over a note card drag area for cursor change
+        // Check if hovering over a note card drag area or photo card for cursor change
         int hoverCardIndex = HitTestNoteCardDragArea(boardX, boardY);
-        if (hoverCardIndex >= 0 && windowHandle) {
+        int hoverPhotoIndex = HitTestPhotoCard(boardX, boardY);
+        if ((hoverCardIndex >= 0 || hoverPhotoIndex >= 0) && windowHandle) {
             SetCursor(LoadCursor(NULL, IDC_HAND));
         }
 
@@ -550,7 +567,60 @@ void CaseboardMode::StopDraggingNoteCard() {
     draggingNoteCardIndex = -1;
 }
 
-void CaseboardMode::AddPhotoCard(const std::string &photoFilename, int photoNumber) {
+int CaseboardMode::HitTestPhotoCard(float boardX, float boardY) {
+    // Check from top to bottom (reverse order for top-most card first)
+    for (int i = (int)photoCards.size() - 1; i >= 0; i--) {
+        PhotoCard &card = photoCards[i];
+
+        float cardLeft = card.boardX - card.width / 2.0f;
+        float cardTop = card.boardY - card.height / 2.0f;
+        float cardRight = cardLeft + card.width;
+        float cardBottom = cardTop + card.height;
+
+        if (boardX >= cardLeft && boardX <= cardRight && boardY >= cardTop &&
+            boardY <= cardBottom) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void CaseboardMode::StartDraggingPhotoCard(int index, float boardX, float boardY) {
+    if (index < 0 || index >= (int)photoCards.size())
+        return;
+
+    draggingPhotoCardIndex = index;
+    PhotoCard &card = photoCards[index];
+
+    dragOffsetX = boardX - card.boardX;
+    dragOffsetY = boardY - card.boardY;
+
+    wi::backlog::post("Started dragging photo card\n");
+}
+
+void CaseboardMode::UpdateDraggingPhotoCard(float boardX, float boardY) {
+    if (draggingPhotoCardIndex < 0 || draggingPhotoCardIndex >= (int)photoCards.size())
+        return;
+
+    PhotoCard &card = photoCards[draggingPhotoCardIndex];
+
+    card.boardX = boardX - dragOffsetX;
+    card.boardY = boardY - dragOffsetY;
+
+    if (card.container) {
+        Noesis::Canvas::SetLeft(card.container, card.boardX - card.width / 2.0f);
+        Noesis::Canvas::SetTop(card.container, card.boardY - card.height / 2.0f);
+    }
+}
+
+void CaseboardMode::StopDraggingPhotoCard() {
+    if (draggingPhotoCardIndex >= 0) {
+        wi::backlog::post("Stopped dragging photo card\n");
+    }
+    draggingPhotoCardIndex = -1;
+}
+
+void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     if (!caseboardContent) {
         wi::backlog::post("AddPhotoCard: caseboardContent is null!\n");
         return;
@@ -559,55 +629,85 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename, int photoNumb
     wi::backlog::post("AddPhotoCard: Creating photo card...\n");
 
     // Calculate position in board space
-    float boardX = 500.0f + (photoCards.size() % 5) * 200.0f;
-    float boardY = -400.0f + (photoCards.size() / 5) * 280.0f;
+    float boardX = 500.0f + (photoCards.size() % 5) * 250.0f;
+    float boardY = -400.0f + (photoCards.size() / 5) * 350.0f;
 
-    // Create the photo card container
+    // Physical evidence card dimensions from original Unreal (Card.h), scaled up 2x:
+    // Original: 128x160 -> Scaled: 256x320
+    const float cardWidth = 256.0f;
+    const float cardHeight = 320.0f;
+
+    // Layout constants from Card.h (scaled 2x):
+    // - Label height: 16px -> 32px
+    // - Image margin: 8px -> 16px (on left, right, and bottom)
+    // - Image area: 112x136px -> 224x272px
+    const float imageMargin = 16.0f;
+    const float labelHeight = 32.0f;
+    const float imageAreaTop = labelHeight + imageMargin;
+    const float imageAreaBottom = imageMargin;
+
+    // Create the photo card container (Grid with fixed dimensions)
     Noesis::Ptr<Noesis::Grid> photoContainer = *new Noesis::Grid();
-    photoContainer->SetWidth(160.0f);
-    photoContainer->SetHeight(200.0f);
+    photoContainer->SetWidth(cardWidth);
+    photoContainer->SetHeight(cardHeight);
 
-    // Create border with vintage photo style
-    Noesis::Ptr<Noesis::Border> photoBorder = *new Noesis::Border();
-    photoBorder->SetBackground(
-        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(245, 240, 230)));
-    photoBorder->SetBorderBrush(
-        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(180, 160, 140)));
-    photoBorder->SetBorderThickness(Noesis::Thickness(2.0f));
-    photoBorder->SetPadding(Noesis::Thickness(8.0f, 8.0f, 8.0f, 24.0f));
+    // Layer 1: Background - Physical evidence card bitmap
+    Noesis::Ptr<Noesis::Image> cardBackground = *new Noesis::Image();
+    Noesis::Ptr<Noesis::BitmapImage> cardBgBitmap = *new Noesis::BitmapImage();
+    // Use Note_Card.png as the base (it's a generic card design)
+    cardBgBitmap->SetUriSource(Noesis::Uri("GUI/Cards/Note_Card.png"));
+    cardBackground->SetSource(cardBgBitmap);
+    cardBackground->SetStretch(Noesis::Stretch_Fill);
+    cardBackground->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
+    cardBackground->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
+    photoContainer->GetChildren()->Add(cardBackground);
 
-    // Create inner grid for image
-    Noesis::Ptr<Noesis::Grid> innerGrid = *new Noesis::Grid();
+    // Layer 2: Photo image (positioned with margins matching Unreal Card.h layout)
+    // The image occupies the space: [imageMargin, imageAreaTop] to [cardWidth-imageMargin,
+    // cardHeight-imageAreaBottom]
+    Noesis::Ptr<Noesis::Grid> photoImageContainer = *new Noesis::Grid();
+    photoImageContainer->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
+    photoImageContainer->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
+    photoImageContainer->SetMargin(
+        Noesis::Thickness(imageMargin, imageAreaTop, imageMargin, imageAreaBottom));
 
-    // Load the photo image
     Noesis::Ptr<Noesis::Image> photoImage = *new Noesis::Image();
-    Noesis::Ptr<Noesis::BitmapImage> bitmapSource = *new Noesis::BitmapImage();
-    bitmapSource->SetUriSource(Noesis::Uri(photoFilename.c_str()));
-    photoImage->SetSource(bitmapSource);
+    Noesis::Ptr<Noesis::BitmapImage> photoBitmap = *new Noesis::BitmapImage();
+    photoBitmap->SetUriSource(Noesis::Uri(photoFilename.c_str()));
+    photoImage->SetSource(photoBitmap);
     photoImage->SetStretch(Noesis::Stretch_Uniform);
-    photoImage->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
     photoImage->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
-    innerGrid->GetChildren()->Add(photoImage);
+    photoImage->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
+    photoImageContainer->GetChildren()->Add(photoImage);
+    photoContainer->GetChildren()->Add(photoImageContainer);
 
-    photoBorder->SetChild(innerGrid);
-    photoContainer->GetChildren()->Add(photoBorder);
-
-    // Create label
+    // Layer 3: Label (centered at the top, within labelHeight area)
     Noesis::Ptr<Noesis::TextBlock> photoLabel = *new Noesis::TextBlock();
-    std::string labelText = "Photo #" + std::to_string(photoNumber);
+    std::string labelText = "Photo";
     photoLabel->SetText(labelText.c_str());
-    photoLabel->SetFontSize(10.0f);
-    photoLabel->SetForeground(Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(100, 80, 60)));
+    photoLabel->SetFontSize(20.0f);
+    photoLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Opera-Lyrics-Smooth"));
+    photoLabel->SetForeground(Noesis::MakePtr<Noesis::SolidColorBrush>(
+        Noesis::Color(0x2B, 0x3D, 0x5C))); // Dark ink color
     photoLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
-    photoLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Bottom);
-    photoLabel->SetMargin(Noesis::Thickness(0, 0, 0, 6));
+    photoLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
+    photoLabel->SetMargin(Noesis::Thickness(imageMargin, 6.0f, imageMargin, 0));
     photoLabel->SetEffect(nullptr);
     photoLabel->SetFontWeight(Noesis::FontWeight_Normal);
+    photoLabel->SetTextAlignment(Noesis::TextAlignment_Center);
     photoContainer->GetChildren()->Add(photoLabel);
 
-    // Position on canvas
-    Noesis::Canvas::SetLeft(photoContainer, boardX - 80.0f);
-    Noesis::Canvas::SetTop(photoContainer, boardY - 100.0f);
+    // Add drop shadow effect to entire card (matching Unreal shadow rendering)
+    Noesis::Ptr<Noesis::DropShadowEffect> shadowEffect = *new Noesis::DropShadowEffect();
+    shadowEffect->SetColor(Noesis::Color(0, 0, 0));
+    shadowEffect->SetOpacity(0.5f);
+    shadowEffect->SetBlurRadius(12.0f);
+    shadowEffect->SetShadowDepth(6.0f);
+    photoContainer->SetEffect(shadowEffect);
+
+    // Position on canvas (center the card at boardX, boardY)
+    Noesis::Canvas::SetLeft(photoContainer, boardX - cardWidth / 2.0f);
+    Noesis::Canvas::SetTop(photoContainer, boardY - cardHeight / 2.0f);
 
     // Add to caseboard
     Noesis::UIElementCollection *children = caseboardContent->GetChildren();
@@ -629,5 +729,7 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename, int photoNumb
     card.boardX = boardX;
     card.boardY = boardY;
     card.labelText = labelText;
+    card.width = cardWidth;
+    card.height = cardHeight;
     photoCards.push_back(card);
 }

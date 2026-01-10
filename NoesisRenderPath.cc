@@ -86,7 +86,9 @@ void NoesisRenderPath::EnterCameraMode() {
     // Hide aim dot
     aimDotVisible = false;
 
-    // Switch to first-person camera
+    // Exit third-person mode first (to properly manage cursor visibility)
+    SetThirdPersonMode(false);
+    // Then switch to first-person camera
     SetFirstPersonMode(true);
 }
 
