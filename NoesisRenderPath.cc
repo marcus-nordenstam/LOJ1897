@@ -865,97 +865,149 @@ void NoesisRenderPath::TakePhoto() {
 void NoesisRenderPath::CaptureFrameToMemory() {
     wi::graphics::GraphicsDevice *device = wi::graphics::GetDevice();
     if (!device) {
-        wi::backlog::post("CaptureFrameToMemory: No graphics device!\n");
+        wi::backlog::post("CaptureFrameToMemory: No graphics device!",
+                          wi::backlog::LogLevel::Error);
         return;
     }
 
     // Try GetLastPostprocessRT first (the actual 3D render), fall back to GetRenderResult
     const wi::graphics::Texture *renderResultPtr = GetLastPostprocessRT();
     if (!renderResultPtr || !renderResultPtr->IsValid()) {
-        wi::backlog::post(
-            "CaptureFrameToMemory: GetLastPostprocessRT invalid, trying GetRenderResult\n");
         renderResultPtr = &GetRenderResult();
     }
-
     if (!renderResultPtr || !renderResultPtr->IsValid()) {
-        wi::backlog::post("CaptureFrameToMemory: No valid render result\n");
+        wi::backlog::post("CaptureFrameToMemory: No valid render result",
+                          wi::backlog::LogLevel::Error);
         return;
     }
 
     const wi::graphics::Texture &renderResult = *renderResultPtr;
+    wi::graphics::TextureDesc texDesc = renderResult.GetDesc();
 
-    // Use Wicked's built-in screenshot to save directly to PNG (handles format conversion)
+    // Step 1: Get raw GPU data
+    wi::vector<uint8_t> rawData;
+    if (!wi::helper::saveTextureToMemory(renderResult, rawData)) {
+        wi::backlog::post("CaptureFrameToMemory: Failed to read texture",
+                          wi::backlog::LogLevel::Error);
+        return;
+    }
+
+    // Step 2: Convert to RGBA8 (4 bytes per pixel)
+    std::vector<uint8_t> rgba8Data;
+    if (!ConvertToRGBA8(rawData, texDesc, rgba8Data)) {
+        wi::backlog::post("CaptureFrameToMemory: Format conversion failed",
+                          wi::backlog::LogLevel::Error);
+        return;
+    }
+
+    // Step 3: Crop to center 1/3
+    uint32_t cropWidth = texDesc.width / 3;
+    uint32_t cropHeight = texDesc.height / 3;
+    uint32_t cropX = texDesc.width / 3;
+    uint32_t cropY = texDesc.height / 3;
+
+    std::vector<uint8_t> croppedData(cropWidth * cropHeight * 4);
+    for (uint32_t y = 0; y < cropHeight; ++y) {
+        const uint8_t *srcRow = rgba8Data.data() + (cropY + y) * texDesc.width * 4 + cropX * 4;
+        uint8_t *dstRow = croppedData.data() + y * cropWidth * 4;
+        std::memcpy(dstRow, srcRow, cropWidth * 4);
+    }
+
+    // Step 4: Apply post-processing (sepia, grain)
+    ApplySepia(croppedData, cropWidth, cropHeight);
+    AddFilmGrain(croppedData, cropWidth, cropHeight);
+
+    // Step 5: Write PNG directly using stb_image_write
     CreateDirectoryA("SavedGameData", NULL);
     CreateDirectoryA("SavedGameData/Photos", NULL);
-
-    // This will be the final photo file (incremented in OnPhotoCaptured, so use +1 here)
-    int photoNum = photosTaken + 1;
-    pendingPhotoFilename = "SavedGameData/Photos/photo_" + std::to_string(photoNum) + ".png";
-
-    // saveTextureToFile handles all format conversions internally
-    if (!wi::helper::saveTextureToFile(renderResult, pendingPhotoFilename)) {
-        wi::backlog::post("Photo capture failed: Could not save screenshot\n");
-        return;
-    }
-
-    // Load the PNG back using stb_image to get RGBA8 data we can crop and process
-    int loadedWidth, loadedHeight, channels;
-    unsigned char *imageData =
-        stbi_load(pendingPhotoFilename.c_str(), &loadedWidth, &loadedHeight, &channels, 4);
-
-    if (!imageData) {
-        wi::backlog::post("CaptureFrameToMemory: Failed to load PNG!\n");
-        return;
-    }
-
-    // Crop the center 1/3 of the image (simulating camera viewfinder crop)
-    int cropWidth = loadedWidth / 3;
-    int cropHeight = loadedHeight / 3;
-    int startX = loadedWidth / 3;
-    int startY = loadedHeight / 3;
-
-    int srcStride = loadedWidth * 4;
-    int dstStride = cropWidth * 4;
-
-    // Store cropped pixels for later processing
-    pendingPhotoPixels.resize(cropWidth * cropHeight * 4);
-    pendingPhotoWidth = cropWidth;
-    pendingPhotoHeight = cropHeight;
-
-    for (int y = 0; y < cropHeight; y++) {
-        int srcY = startY + y;
-        const uint8_t *srcRow = imageData + srcY * srcStride + startX * 4;
-        uint8_t *dstRow = pendingPhotoPixels.data() + y * dstStride;
-        memcpy(dstRow, srcRow, dstStride);
-    }
-
-    stbi_image_free(imageData);
-
-    hasPendingPhoto = true;
-
     photosTaken++;
-    UpdateCameraPhotoCount();
+    const std::string photo_filename =
+        "SavedGameData/Photos/photo_" + std::to_string(photosTaken) + ".png";
 
-    // Apply vintage photo effects to the captured pixels
-    ApplySepia(pendingPhotoPixels, pendingPhotoWidth, pendingPhotoHeight);
-    AddFilmGrain(pendingPhotoPixels, pendingPhotoWidth, pendingPhotoHeight);
-
-    // Overwrite the photo file with the processed (cropped + effects) version
-    if (!SaveProcessedPhoto(pendingPhotoFilename, pendingPhotoPixels, pendingPhotoWidth,
-                            pendingPhotoHeight)) {
-        wi::backlog::post("ProcessAndCreatePhotoCard: Failed to save processed photo\n");
-        hasPendingPhoto = false;
+    if (!stbi_write_png(photo_filename.c_str(), cropWidth, cropHeight, 4, croppedData.data(),
+                        cropWidth * 4)) {
+        wi::backlog::post("CaptureFrameToMemory: Failed to write PNG",
+                          wi::backlog::LogLevel::Error);
         return;
     }
-    // Create the photo card in caseboard
-    AddPhotoCard(pendingPhotoFilename);
 
-    // Clear pending photo state
-    hasPendingPhoto = false;
-    pendingPhotoPixels.clear();
-    pendingPhotoWidth = 0;
-    pendingPhotoHeight = 0;
-    pendingPhotoFilename.clear();
+    UpdateCameraPhotoCount();
+    AddPhotoCard(photo_filename);
+}
+
+// Convert raw GPU texture data to RGBA8 format
+bool NoesisRenderPath::ConvertToRGBA8(const wi::vector<uint8_t> &rawData,
+                                      const wi::graphics::TextureDesc &desc,
+                                      std::vector<uint8_t> &rgba8Data) {
+    using namespace wi::graphics;
+
+    rgba8Data.resize(desc.width * desc.height * 4);
+    const uint32_t pixelCount = desc.width * desc.height;
+
+    // Handle common formats (add more as needed)
+    if (desc.format == Format::R8G8B8A8_UNORM || desc.format == Format::R8G8B8A8_UNORM_SRGB) {
+        // Already RGBA8, just copy
+        std::memcpy(rgba8Data.data(), rawData.data(), pixelCount * 4);
+        return true;
+    } else if (desc.format == Format::B8G8R8A8_UNORM ||
+               desc.format == Format::B8G8R8A8_UNORM_SRGB) {
+        // BGRA to RGBA
+        const uint32_t *src = (const uint32_t *)rawData.data();
+        uint32_t *dst = (uint32_t *)rgba8Data.data();
+        for (uint32_t i = 0; i < pixelCount; ++i) {
+            uint32_t pixel = src[i];
+            uint8_t b = (pixel >> 0) & 0xFF;
+            uint8_t g = (pixel >> 8) & 0xFF;
+            uint8_t r = (pixel >> 16) & 0xFF;
+            uint8_t a = (pixel >> 24) & 0xFF;
+            dst[i] = r | (g << 8) | (b << 16) | (a << 24);
+        }
+        return true;
+    } else if (desc.format == Format::R16G16B16A16_FLOAT) {
+        // Float16 to RGBA8
+        const XMHALF4 *src = (const XMHALF4 *)rawData.data();
+        uint32_t *dst = (uint32_t *)rgba8Data.data();
+        for (uint32_t i = 0; i < pixelCount; ++i) {
+            float r = std::clamp(XMConvertHalfToFloat(src[i].x), 0.0f, 1.0f);
+            float g = std::clamp(XMConvertHalfToFloat(src[i].y), 0.0f, 1.0f);
+            float b = std::clamp(XMConvertHalfToFloat(src[i].z), 0.0f, 1.0f);
+            float a = std::clamp(XMConvertHalfToFloat(src[i].w), 0.0f, 1.0f);
+            dst[i] = ((uint32_t)(r * 255) << 0) | ((uint32_t)(g * 255) << 8) |
+                     ((uint32_t)(b * 255) << 16) | ((uint32_t)(a * 255) << 24);
+        }
+        return true;
+    } else if (desc.format == Format::R10G10B10A2_UNORM) {
+        // 10-bit to 8-bit
+        const uint32_t *src = (const uint32_t *)rawData.data();
+        uint32_t *dst = (uint32_t *)rgba8Data.data();
+        for (uint32_t i = 0; i < pixelCount; ++i) {
+            uint32_t pixel = src[i];
+            uint8_t r = (uint8_t)(((pixel >> 0) & 1023) * 255 / 1023);
+            uint8_t g = (uint8_t)(((pixel >> 10) & 1023) * 255 / 1023);
+            uint8_t b = (uint8_t)(((pixel >> 20) & 1023) * 255 / 1023);
+            uint8_t a = (uint8_t)(((pixel >> 30) & 3) * 255 / 3);
+            dst[i] = r | (g << 8) | (b << 16) | (a << 24);
+        }
+        return true;
+    } else if (desc.format == Format::R11G11B10_FLOAT) {
+        // R11G11B10 float to RGBA8
+        const XMFLOAT3PK *src = (const XMFLOAT3PK *)rawData.data();
+        uint32_t *dst = (uint32_t *)rgba8Data.data();
+        for (uint32_t i = 0; i < pixelCount; ++i) {
+            XMFLOAT3PK pixel = src[i];
+            XMVECTOR V = XMLoadFloat3PK(&pixel);
+            XMFLOAT3 pixel3;
+            XMStoreFloat3(&pixel3, V);
+            float r = std::clamp(pixel3.x, 0.0f, 1.0f);
+            float g = std::clamp(pixel3.y, 0.0f, 1.0f);
+            float b = std::clamp(pixel3.z, 0.0f, 1.0f);
+            dst[i] = ((uint32_t)(r * 255) << 0) | ((uint32_t)(g * 255) << 8) |
+                     ((uint32_t)(b * 255) << 16) | (255 << 24);
+        }
+        return true;
+    }
+
+    return false; // Unsupported format
 }
 
 // Save processed photo pixels to a PNG file, returns the filename

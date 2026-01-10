@@ -10,6 +10,7 @@
 
 // For stbi_load to load PNG files (stb_image_write is in wiHelper.cpp)
 #include "Utility/stb_image.h"
+#include "Utility/stb_image_write.h"
 
 #include <Systems/animation_system.h>
 #include <Systems/character_system.h>
@@ -147,9 +148,9 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Player character tracking
     wi::ecs::Entity playerCharacter = wi::ecs::INVALID_ENTITY;
     std::vector<wi::ecs::Entity> hiddenPlayerObjects; // Objects hidden during camera mode
-    float cameraHorizontal = 0.0f; // Camera yaw angle
-    float cameraVertical = 0.3f;   // Camera pitch angle
-    float cameraDistance = 2.5f;   // Camera distance from player
+    float cameraHorizontal = 0.0f;                    // Camera yaw angle
+    float cameraVertical = 0.3f;                      // Camera pitch angle
+    float cameraDistance = 2.5f;                      // Camera distance from player
     float cameraHorizontalOffset = 0.25f; // Over-the-shoulder horizontal offset (positive = right)
 
     // NPC tracking and Lua scripts
@@ -181,13 +182,6 @@ class NoesisRenderPath : public wi::RenderPath3D {
     float shutterDuration = 0.15f;         // Total animation time in seconds
     float shutterTime = 0.0f;              // Internal time accumulator
     bool photoCapturedThisShutter = false; // Flag to prevent multiple captures
-
-    // Pending photo data (captured before shutter, processed after)
-    std::vector<uint8_t> pendingPhotoPixels;
-    int pendingPhotoWidth = 0;
-    int pendingPhotoHeight = 0;
-    bool hasPendingPhoto = false;
-    std::string pendingPhotoFilename; // The saved photo file path
 
     // Flag to request capture at end of frame (after rendering is complete)
     bool captureRequestPending = false;
@@ -317,6 +311,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     // Capture the current frame to memory (before shutter obscures it)
     void CaptureFrameToMemory();
+    
+    // Convert raw GPU texture data to RGBA8 format
+    bool ConvertToRGBA8(const wi::vector<uint8_t>& rawData, 
+                        const wi::graphics::TextureDesc& desc, 
+                        std::vector<uint8_t>& rgba8Data);
 
     // Apply sepia filter to pixel data (RGBA format)
     void ApplySepia(std::vector<uint8_t> &pixels, int width, int height);
@@ -379,7 +378,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     void LoadGameScene();
 
     void SetThirdPersonMode(bool enabled);
-    
+
     // Enable/disable first-person camera mode (for camera/photography mode)
     void SetFirstPersonMode(bool enabled);
 
