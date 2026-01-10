@@ -453,10 +453,6 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
 
     // Retarget animations
     if (modelRoot != wi::ecs::INVALID_ENTITY && !animationLibrary.empty()) {
-        sprintf_s(buffer, "Retargeting animations for character (Entity: %llu)...\n",
-                  characterEntity);
-        wi::backlog::post(buffer);
-
         wi::ecs::Entity idle_anim = FindAnimationByName(scene, "idle");
         wi::ecs::Entity walk_anim = FindAnimationByName(scene, "walk");
         wi::ecs::Entity sit_anim = FindAnimationByName(scene, "sit");
@@ -479,15 +475,10 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
         }
 
         character.SetAction(scene, wi::scene::character_system::make_idle(scene, character));
-
-        wi::backlog::post("Animations retargeted successfully\n");
     }
 
     // Bind expressions
     if (modelRoot != wi::ecs::INVALID_ENTITY && !scene.unbound_expressions.empty()) {
-        sprintf_s(buffer, "Binding expressions for character (Entity: %llu)...\n", characterEntity);
-        wi::backlog::post(buffer);
-
         int mapped_count = 0;
         for (size_t expr_index = 0; expr_index < scene.unbound_expressions.size(); expr_index++) {
             const auto &expr = scene.unbound_expressions[expr_index];
@@ -496,15 +487,9 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
                 auto expr_comp = scene.demand_expression_component(target_entity);
                 if (expr_comp->bind_expression(scene, expr_index, target_entity)) {
                     mapped_count++;
-                    sprintf_s(buffer, "Mapped expression '%s' to entity %llu\n", expr.name.c_str(),
-                              target_entity);
-                    wi::backlog::post(buffer);
                 }
             }
         }
-        sprintf_s(buffer, "Bound %d of %d expressions\n", mapped_count,
-                  (int)scene.unbound_expressions.size());
-        wi::backlog::post(buffer);
     }
 
     sprintf_s(buffer, "%s character spawned successfully (Entity: %llu)\n",
