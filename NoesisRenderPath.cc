@@ -35,7 +35,7 @@ void NoesisRenderPath::EnterDialogueMode(wi::ecs::Entity npcEntity) {
     aimDotVisible = false;
 
     // Release mouse capture for UI interaction
-    SetFirstPersonMode(false);
+    SetThirdPersonMode(false);
 
     // Clear previous dialogue and add initial greeting
     ClearDialogue();
@@ -73,7 +73,7 @@ void NoesisRenderPath::ExitDialogueMode() {
     }
 
     // Re-enable walkabout controls
-    SetFirstPersonMode(true);
+    SetThirdPersonMode(true);
 
     wi::backlog::post("Exited dialogue mode\n");
 }
@@ -228,7 +228,7 @@ void NoesisRenderPath::EnterCaseboardMode() {
     aimDotVisible = false;
 
     // Release mouse capture for UI interaction
-    SetFirstPersonMode(false);
+    SetThirdPersonMode(false);
 
     wi::backlog::post("Entered caseboard mode\n");
 }
@@ -252,7 +252,7 @@ void NoesisRenderPath::ExitCaseboardMode() {
     }
 
     // Re-enable walkabout controls
-    SetFirstPersonMode(true);
+    SetThirdPersonMode(true);
 
     wi::backlog::post("Exited caseboard mode\n");
 }
@@ -746,6 +746,56 @@ void NoesisRenderPath::EnterCameraMode() {
 
     inCameraMode = true;
 
+    // Switch to first-person camera
+    SetFirstPersonMode(true);
+
+    // Hide player character by setting SetRenderable(false) on all object components
+    hiddenPlayerObjects.clear();
+    if (playerCharacter != wi::ecs::INVALID_ENTITY) {
+        wi::scene::Scene &scene = wi::scene::GetScene();
+
+        // Hide the player's own object component if it has one
+        wi::scene::ObjectComponent *playerObject = scene.objects.GetComponent(playerCharacter);
+        if (playerObject) {
+            playerObject->SetRenderable(false);
+            hiddenPlayerObjects.push_back(playerCharacter);
+        }
+
+        // Hide all child entities that have object components (character meshes, accessories, etc.)
+        for (size_t i = 0; i < scene.hierarchy.GetCount(); i++) {
+            wi::ecs::Entity entity = scene.hierarchy.GetEntity(i);
+            wi::scene::HierarchyComponent *hierarchy = scene.hierarchy.GetComponent(entity);
+
+            // Check if this entity is a descendant of the player (direct or indirect)
+            wi::ecs::Entity parent = hierarchy->parentID;
+            bool isPlayerDescendant = false;
+            while (parent != wi::ecs::INVALID_ENTITY) {
+                if (parent == playerCharacter) {
+                    isPlayerDescendant = true;
+                    break;
+                }
+                wi::scene::HierarchyComponent *parentHierarchy =
+                    scene.hierarchy.GetComponent(parent);
+                parent = parentHierarchy ? parentHierarchy->parentID : wi::ecs::INVALID_ENTITY;
+            }
+
+            if (isPlayerDescendant) {
+                wi::scene::ObjectComponent *childObject = scene.objects.GetComponent(entity);
+                if (childObject) {
+                    childObject->SetRenderable(false);
+                    hiddenPlayerObjects.push_back(entity);
+                }
+            }
+        }
+
+        char buf[128];
+        sprintf_s(buf, "EnterCameraMode: Hidden %zu player objects\n", hiddenPlayerObjects.size());
+        wi::backlog::post(buf);
+    }
+
+    // Hide aim dot and crosshair
+    aimDotVisible = false;
+
     // Show camera panel
     if (cameraPanel) {
         cameraPanel->SetVisibility(Noesis::Visibility_Visible);
@@ -766,6 +816,25 @@ void NoesisRenderPath::ExitCameraMode() {
         return;
 
     inCameraMode = false;
+
+    // Restore player character visibility by setting SetRenderable(true) on all hidden objects
+    if (!hiddenPlayerObjects.empty()) {
+        wi::scene::Scene &scene = wi::scene::GetScene();
+        for (wi::ecs::Entity entity : hiddenPlayerObjects) {
+            wi::scene::ObjectComponent *object = scene.objects.GetComponent(entity);
+            if (object) {
+                object->SetRenderable(true);
+            }
+        }
+        char buf[128];
+        sprintf_s(buf, "ExitCameraMode: Restored %zu player objects\n", hiddenPlayerObjects.size());
+        wi::backlog::post(buf);
+        hiddenPlayerObjects.clear();
+    }
+
+    // Switch back to third-person camera
+    SetFirstPersonMode(false); // Disable first-person mode
+    SetThirdPersonMode(true);  // Restore third-person camera following
 
     // Hide camera panel
     if (cameraPanel) {
@@ -814,9 +883,6 @@ void NoesisRenderPath::CaptureFrameToMemory() {
     }
 
     const wi::graphics::Texture &renderResult = *renderResultPtr;
-    wi::graphics::TextureDesc desc = renderResult.GetDesc();
-    int origWidth = desc.width;
-    int origHeight = desc.height;
 
     // Use Wicked's built-in screenshot to save directly to PNG (handles format conversion)
     CreateDirectoryA("SavedGameData", NULL);
@@ -1140,23 +1206,9 @@ void NoesisRenderPath::UpdateCameraPhotoCount() {
     cameraPhotoCount->SetText(buf);
 }
 
-// Update viewfinder layout based on window size
+// Update viewfinder layout based on window size (now a no-op since viewfinder is just an image)
 void NoesisRenderPath::UpdateViewfinderLayout() {
-    if (!windowHandle || !cameraPanel)
-        return;
-
-    RECT clientRect;
-    GetClientRect(windowHandle, &clientRect);
-    float width = (float)(clientRect.right - clientRect.left);
-    float height = (float)(clientRect.bottom - clientRect.top);
-
-    // Note: The viewfinder grid lines and corner brackets are positioned
-    // dynamically via XAML bindings or would need to be updated here.
-    // For simplicity, the XAML uses a fixed corner at top-left,
-    // and the other corners would need Path.Data updates.
-
-    // The rule-of-thirds grid lines need positioning at 1/3 and 2/3
-    // This would require finding the elements and setting Canvas.Left/Top
+    // Viewfinder is now a single image that stretches to fill the panel
 }
 
 // Handle mouse click in camera mode
@@ -1182,7 +1234,7 @@ bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
     if (inCameraMode) {
         switch (key) {
         case Noesis::Key_Escape:
-        case Noesis::Key_P:
+        case Noesis::Key_Tab:
             ExitCameraMode();
             return true; // Consumed
         case Noesis::Key_Space:
@@ -1241,7 +1293,7 @@ bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
     case Noesis::Key_C:
         EnterCaseboardMode();
         return true; // Consumed
-    case Noesis::Key_P:
+    case Noesis::Key_Tab:
         EnterCameraMode();
         return true; // Consumed
     default:
@@ -1913,8 +1965,7 @@ void NoesisRenderPath::LoadGameScene() {
     }
 }
 
-// Enable/disable walkabout control mode (mouse capture for third-person camera control)
-void NoesisRenderPath::SetFirstPersonMode(bool enabled) {
+void NoesisRenderPath::SetThirdPersonMode(bool enabled) {
     if (!windowHandle)
         return;
 
@@ -1951,6 +2002,42 @@ void NoesisRenderPath::SetFirstPersonMode(bool enabled) {
         mouseInitialized = false;
 
         wi::backlog::post("Walkabout control mode disabled. Mouse released.\n");
+    }
+}
+
+// Enable/disable first-person camera mode (for camera/photography mode)
+void NoesisRenderPath::SetFirstPersonMode(bool enabled) {
+    if (!windowHandle)
+        return;
+
+    if (enabled) {
+        // Hide and capture the cursor (same as third-person mode)
+        ShowCursor(FALSE);
+
+        // Get window center for mouse reset
+        RECT clientRect;
+        GetClientRect(windowHandle, &clientRect);
+        POINT center = {(clientRect.right - clientRect.left) / 2,
+                        (clientRect.bottom - clientRect.top) / 2};
+        ClientToScreen(windowHandle, &center);
+        SetCursorPos(center.x, center.y);
+
+        // Clip cursor to window
+        RECT windowRect;
+        GetWindowRect(windowHandle, &windowRect);
+        ClipCursor(&windowRect);
+
+        mouseInitialized = false;
+
+        wi::backlog::post("First-person camera mode enabled (for photography).\n");
+    } else {
+        // Show cursor and release capture
+        ShowCursor(TRUE);
+        ClipCursor(nullptr);
+
+        mouseInitialized = false;
+
+        wi::backlog::post("First-person camera mode disabled.\n");
     }
 }
 
@@ -2035,9 +2122,116 @@ void NoesisRenderPath::Update(float dt) {
         SimulateShutter(dt);
     }
 
-    // Skip walkabout controls while in GUI mode
-    if (inDialogueMode | inCaseboardMode | inCameraMode | inMainMenuMode) {
+    // Skip walkabout controls while in GUI mode (except camera mode which needs camera control)
+    if (inDialogueMode | inCaseboardMode | inMainMenuMode) {
         return;
+    }
+
+    // Handle camera mode separately (first-person camera at player's eyes)
+    if (inCameraMode && playerCharacter != wi::ecs::INVALID_ENTITY) {
+        wi::scene::Scene &scene = wi::scene::GetScene();
+        wi::scene::CharacterComponent *playerChar = scene.characters.GetComponent(playerCharacter);
+
+        if (playerChar) {
+            // === MOUSE LOOK (same as third-person mode) ===
+            if (windowHandle) {
+                RECT clientRect;
+                GetClientRect(windowHandle, &clientRect);
+                POINT center = {(clientRect.right - clientRect.left) / 2,
+                                (clientRect.bottom - clientRect.top) / 2};
+                POINT currentPos;
+                GetCursorPos(&currentPos);
+                ScreenToClient(windowHandle, &currentPos);
+
+                if (mouseInitialized) {
+                    float deltaX = (float)(currentPos.x - center.x) * mouseSensitivity;
+                    float deltaY = (float)(currentPos.y - center.y) * mouseSensitivity;
+
+                    if (deltaX != 0.0f || deltaY != 0.0f) {
+                        cameraHorizontal += deltaX;
+                        cameraVertical =
+                            std::clamp(cameraVertical + deltaY, -XM_PIDIV4, XM_PIDIV4 * 1.2f);
+                    }
+                } else {
+                    mouseInitialized = true;
+                }
+
+                POINT screenCenter = center;
+                ClientToScreen(windowHandle, &screenCenter);
+                SetCursorPos(screenCenter.x, screenCenter.y);
+            }
+
+            // === WASD MOVEMENT (first-person) ===
+            bool wPressed = (GetAsyncKeyState('W') & 0x8000) != 0;
+            bool sPressed = (GetAsyncKeyState('S') & 0x8000) != 0;
+            bool aPressed = (GetAsyncKeyState('A') & 0x8000) != 0;
+            bool dPressed = (GetAsyncKeyState('D') & 0x8000) != 0;
+
+            if (wPressed || sPressed || aPressed || dPressed) {
+                if (playerChar->IsGrounded() || playerChar->IsWallIntersect()) {
+                    // Calculate movement direction based on camera rotation
+                    XMFLOAT3 move_dir(0, 0, 0);
+
+                    if (wPressed) {
+                        // Forward relative to camera
+                        move_dir.x += sinf(cameraHorizontal);
+                        move_dir.z += cosf(cameraHorizontal);
+                    }
+                    if (sPressed) {
+                        // Backward relative to camera
+                        move_dir.x -= sinf(cameraHorizontal);
+                        move_dir.z -= cosf(cameraHorizontal);
+                    }
+                    if (aPressed) {
+                        // Left (strafe) relative to camera
+                        move_dir.x -= cosf(cameraHorizontal);
+                        move_dir.z += sinf(cameraHorizontal);
+                    }
+                    if (dPressed) {
+                        // Right (strafe) relative to camera
+                        move_dir.x += cosf(cameraHorizontal);
+                        move_dir.z -= sinf(cameraHorizontal);
+                    }
+
+                    // Normalize movement direction
+                    float len = sqrtf(move_dir.x * move_dir.x + move_dir.z * move_dir.z);
+                    if (len > 0.001f) {
+                        move_dir.x /= len;
+                        move_dir.z /= len;
+                    }
+                    move_dir.y = 0.0f;
+
+                    // Walk action with direction
+                    auto action =
+                        wi::scene::character_system::make_walk(scene, *playerChar, move_dir);
+                    playerChar->SetAction(scene, action);
+                }
+            } else if (playerChar->IsWalking()) {
+                // Return to idle when no movement key pressed
+                auto action = wi::scene::character_system::make_idle(scene, *playerChar);
+                playerChar->SetAction(scene, action);
+            }
+
+            // === FIRST-PERSON CAMERA (at player's eyes) ===
+            XMFLOAT3 charPos = playerChar->GetPositionInterpolated();
+
+            // Camera position at player's eye level
+            XMFLOAT3 camPos;
+            camPos.x = charPos.x;
+            camPos.y = charPos.y + 1.6f; // Eye level
+            camPos.z = charPos.z;
+
+            // Apply camera rotation based on mouse look
+            wi::scene::TransformComponent cameraTransform;
+            cameraTransform.ClearTransform();
+            cameraTransform.Translate(camPos);
+            cameraTransform.RotateRollPitchYaw(XMFLOAT3(cameraVertical, cameraHorizontal, 0));
+            cameraTransform.UpdateTransform();
+
+            camera->TransformCamera(cameraTransform);
+            camera->UpdateCamera();
+        }
+        return; // Camera mode handled, don't run third-person logic
     }
 
     // Handle walkabout-style controls and third-person camera when game is active
@@ -2128,7 +2322,7 @@ void NoesisRenderPath::Update(float dt) {
             static bool escWasPressed = false;
             bool escPressed = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
             if (escPressed && !escWasPressed) {
-                SetFirstPersonMode(false);
+                SetThirdPersonMode(false);
                 inMainMenuMode = true;
                 if (menuContainer) {
                     menuContainer->SetVisibility(Noesis::Visibility_Visible);
@@ -2345,8 +2539,8 @@ void NoesisRenderPath::Compose(wi::graphics::CommandList cmd) const {
     // Call parent Compose first (Wicked Engine composes its layers to backbuffer)
     RenderPath3D::Compose(cmd);
 
-    // Draw aim dot at raycast hit position
-    if (!inMainMenuMode && aimDotVisible) {
+    // Draw aim dot at raycast hit position (not in camera mode)
+    if (!inMainMenuMode && !inCameraMode && aimDotVisible) {
         wi::image::SetCanvas(*this);
 
         // Outer circle: 4px radius, semi-transparent
@@ -2536,7 +2730,7 @@ void NoesisRenderPath::InitializeNoesis() {
                 LoadGameScene();
 
                 // Enable walkabout controls (mouse capture for third-person camera control)
-                SetFirstPersonMode(true);
+                SetThirdPersonMode(true);
             };
     }
 

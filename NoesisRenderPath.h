@@ -146,9 +146,10 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     // Player character tracking
     wi::ecs::Entity playerCharacter = wi::ecs::INVALID_ENTITY;
-    float cameraHorizontal = 0.0f;        // Camera yaw angle
-    float cameraVertical = 0.3f;          // Camera pitch angle
-    float cameraDistance = 2.5f;          // Camera distance from player
+    std::vector<wi::ecs::Entity> hiddenPlayerObjects; // Objects hidden during camera mode
+    float cameraHorizontal = 0.0f; // Camera yaw angle
+    float cameraVertical = 0.3f;   // Camera pitch angle
+    float cameraDistance = 2.5f;   // Camera distance from player
     float cameraHorizontalOffset = 0.25f; // Over-the-shoulder horizontal offset (positive = right)
 
     // NPC tracking and Lua scripts
@@ -377,10 +378,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     void LoadGameScene();
 
-    // Enable/disable walkabout control mode (mouse capture for third-person camera control)
+    void SetThirdPersonMode(bool enabled);
+    
+    // Enable/disable first-person camera mode (for camera/photography mode)
     void SetFirstPersonMode(bool enabled);
 
-    // Toggle fullscreen mode
     void ToggleFullscreen();
 
     void Start() override;
