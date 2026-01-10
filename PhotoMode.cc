@@ -1,5 +1,5 @@
-#include "CameraSystem.h"
-#include "CaseboardSystem.h"
+#include "PhotoMode.h"
+#include "CaseboardMode.h"
 
 #include "Utility/stb_image_write.h"
 
@@ -8,9 +8,9 @@
 #include <algorithm>
 #include <cmath>
 
-void CameraSystem::Initialize(Noesis::Grid *panel, Noesis::FrameworkElement *shutterTop,
-                              Noesis::FrameworkElement *shutterBottom, Noesis::TextBlock *photoCount,
-                              HWND hwnd) {
+void PhotoMode::Initialize(Noesis::Grid *panel, Noesis::FrameworkElement *shutterTop,
+                           Noesis::FrameworkElement *shutterBottom, Noesis::TextBlock *photoCount,
+                           HWND hwnd) {
     cameraPanel = Noesis::Ptr<Noesis::Grid>(panel);
     shutterBarTop = Noesis::Ptr<Noesis::FrameworkElement>(shutterTop);
     shutterBarBottom = Noesis::Ptr<Noesis::FrameworkElement>(shutterBottom);
@@ -18,14 +18,14 @@ void CameraSystem::Initialize(Noesis::Grid *panel, Noesis::FrameworkElement *shu
     windowHandle = hwnd;
 }
 
-void CameraSystem::Shutdown() {
+void PhotoMode::Shutdown() {
     cameraPanel.Reset();
     shutterBarTop.Reset();
     shutterBarBottom.Reset();
     cameraPhotoCount.Reset();
 }
 
-void CameraSystem::EnterCameraMode(wi::ecs::Entity playerEntity, wi::scene::Scene &scene) {
+void PhotoMode::EnterCameraMode(wi::ecs::Entity playerEntity, wi::scene::Scene &scene) {
     if (inCameraMode)
         return;
 
@@ -88,7 +88,7 @@ void CameraSystem::EnterCameraMode(wi::ecs::Entity playerEntity, wi::scene::Scen
     wi::backlog::post("Entered camera mode\n");
 }
 
-void CameraSystem::ExitCameraMode(wi::scene::Scene &scene) {
+void PhotoMode::ExitCameraMode(wi::scene::Scene &scene) {
     if (!inCameraMode)
         return;
 
@@ -121,7 +121,7 @@ void CameraSystem::ExitCameraMode(wi::scene::Scene &scene) {
     wi::backlog::post("Exited camera mode\n");
 }
 
-void CameraSystem::TakePhoto() {
+void PhotoMode::TakePhoto() {
     if (!inCameraMode || shutterActive)
         return;
 
@@ -134,7 +134,7 @@ void CameraSystem::TakePhoto() {
     photoCapturedThisShutter = false;
 }
 
-void CameraSystem::CaptureFrameToMemory(wi::RenderPath3D *renderPath) {
+void PhotoMode::CaptureFrameToMemory(wi::RenderPath3D *renderPath) {
     wi::graphics::GraphicsDevice *device = wi::graphics::GetDevice();
     if (!device) {
         wi::backlog::post("CaptureFrameToMemory: No graphics device!",
@@ -213,7 +213,7 @@ void CameraSystem::CaptureFrameToMemory(wi::RenderPath3D *renderPath) {
     }
 }
 
-void CameraSystem::SimulateShutter(float deltaSeconds) {
+void PhotoMode::SimulateShutter(float deltaSeconds) {
     if (!shutterActive)
         return;
 
@@ -243,7 +243,7 @@ void CameraSystem::SimulateShutter(float deltaSeconds) {
     UpdateShutterBars();
 }
 
-void CameraSystem::UpdateShutterBars() {
+void PhotoMode::UpdateShutterBars() {
     if (!windowHandle)
         return;
 
@@ -263,7 +263,7 @@ void CameraSystem::UpdateShutterBars() {
     }
 }
 
-void CameraSystem::UpdateCameraPhotoCount() {
+void PhotoMode::UpdateCameraPhotoCount() {
     if (!cameraPhotoCount)
         return;
 
@@ -272,11 +272,11 @@ void CameraSystem::UpdateCameraPhotoCount() {
     cameraPhotoCount->SetText(buf);
 }
 
-void CameraSystem::UpdateViewfinderLayout() {
+void PhotoMode::UpdateViewfinderLayout() {
     // Placeholder for viewfinder corner bracket positioning
 }
 
-void CameraSystem::CameraClick(int x, int y) {
+void PhotoMode::CameraClick(int x, int y) {
     if (!inCameraMode)
         return;
 
@@ -284,10 +284,10 @@ void CameraSystem::CameraClick(int x, int y) {
 }
 
 // Image processing helpers
-void CameraSystem::CropRawData(const wi::vector<uint8_t> &srcData, uint32_t srcWidth,
-                               uint32_t srcHeight, uint32_t bytesPerPixel, uint32_t cropX,
-                               uint32_t cropY, uint32_t cropWidth, uint32_t cropHeight,
-                               wi::vector<uint8_t> &dstData) {
+void PhotoMode::CropRawData(const wi::vector<uint8_t> &srcData, uint32_t srcWidth,
+                            uint32_t srcHeight, uint32_t bytesPerPixel, uint32_t cropX,
+                            uint32_t cropY, uint32_t cropWidth, uint32_t cropHeight,
+                            wi::vector<uint8_t> &dstData) {
     dstData.resize(cropWidth * cropHeight * bytesPerPixel);
 
     for (uint32_t y = 0; y < cropHeight; ++y) {
@@ -298,9 +298,9 @@ void CameraSystem::CropRawData(const wi::vector<uint8_t> &srcData, uint32_t srcW
     }
 }
 
-bool CameraSystem::ConvertToRGBA8(const wi::vector<uint8_t> &rawData,
-                                  const wi::graphics::TextureDesc &desc, uint32_t width,
-                                  uint32_t height, std::vector<uint8_t> &rgba8Data) {
+bool PhotoMode::ConvertToRGBA8(const wi::vector<uint8_t> &rawData,
+                               const wi::graphics::TextureDesc &desc, uint32_t width,
+                               uint32_t height, std::vector<uint8_t> &rgba8Data) {
     using namespace wi::graphics;
 
     const uint32_t pixelCount = width * height;
@@ -366,10 +366,10 @@ bool CameraSystem::ConvertToRGBA8(const wi::vector<uint8_t> &rawData,
     return false;
 }
 
-void CameraSystem::DownsampleRGBA8(const std::vector<uint8_t> &srcData, uint32_t srcWidth,
-                                   uint32_t srcHeight, uint32_t downsampleFactor,
-                                   std::vector<uint8_t> &dstData, uint32_t &outWidth,
-                                   uint32_t &outHeight) {
+void PhotoMode::DownsampleRGBA8(const std::vector<uint8_t> &srcData, uint32_t srcWidth,
+                                uint32_t srcHeight, uint32_t downsampleFactor,
+                                std::vector<uint8_t> &dstData, uint32_t &outWidth,
+                                uint32_t &outHeight) {
     outWidth = srcWidth / downsampleFactor;
     outHeight = srcHeight / downsampleFactor;
     dstData.resize(outWidth * outHeight * 4);
@@ -406,7 +406,7 @@ void CameraSystem::DownsampleRGBA8(const std::vector<uint8_t> &srcData, uint32_t
     }
 }
 
-void CameraSystem::ApplySepia(std::vector<uint8_t> &pixels, int width, int height) {
+void PhotoMode::ApplySepia(std::vector<uint8_t> &pixels, int width, int height) {
     for (int i = 0; i < width * height; i++) {
         int idx = i * 4;
 
@@ -426,7 +426,7 @@ void CameraSystem::ApplySepia(std::vector<uint8_t> &pixels, int width, int heigh
     }
 }
 
-void CameraSystem::AddFilmGrain(std::vector<uint8_t> &pixels, int width, int height) {
+void PhotoMode::AddFilmGrain(std::vector<uint8_t> &pixels, int width, int height) {
     // Simple pseudo-random grain
     for (int i = 0; i < width * height; i++) {
         int idx = i * 4;
@@ -446,8 +446,8 @@ void CameraSystem::AddFilmGrain(std::vector<uint8_t> &pixels, int width, int hei
     }
 }
 
-bool CameraSystem::SaveProcessedPhoto(const std::string &filename, const std::vector<uint8_t> &pixels,
-                                      int width, int height) {
+bool PhotoMode::SaveProcessedPhoto(const std::string &filename, const std::vector<uint8_t> &pixels,
+                                   int width, int height) {
     wi::graphics::TextureDesc photoDesc;
     photoDesc.width = width;
     photoDesc.height = height;

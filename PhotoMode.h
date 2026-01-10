@@ -13,13 +13,13 @@
 
 // Forward declarations
 class NoesisRenderPath;
-class CaseboardSystem;
+class CaseboardMode;
 
 // Camera/Photography system for taking evidence photos
-class CameraSystem {
+class PhotoMode {
   public:
-    CameraSystem() = default;
-    ~CameraSystem() = default;
+    PhotoMode() = default;
+    ~PhotoMode() = default;
 
     // Initialize with UI elements from XAML
     void Initialize(Noesis::Grid *panel, Noesis::FrameworkElement *shutterTop,
@@ -30,7 +30,7 @@ class CameraSystem {
     void Shutdown();
 
     // Set reference to caseboard system (for adding photo cards)
-    void SetCaseboardSystem(CaseboardSystem *caseboard) { caseboardSystem = caseboard; }
+    void SetCaseboardSystem(CaseboardMode *caseboard) { caseboardSystem = caseboard; }
 
     // Enter camera mode
     void EnterCameraMode(wi::ecs::Entity playerEntity, wi::scene::Scene &scene);
@@ -110,7 +110,7 @@ class CameraSystem {
     HWND windowHandle = nullptr;
 
     // Reference to caseboard (for adding photo cards)
-    CaseboardSystem *caseboardSystem = nullptr;
+    CaseboardMode *caseboardSystem = nullptr;
 
     // State
     bool inCameraMode = false;

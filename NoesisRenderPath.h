@@ -59,10 +59,10 @@
 #include <vector>
 
 // Include the gameplay subsystems
-#include "CameraSystem.h"
-#include "CaseboardSystem.h"
-#include "DialogueSystem.h"
+#include "CaseboardMode.h"
+#include "DialogueMode.h"
 #include "GameStartup.h"
+#include "PhotoMode.h"
 
 // Noesis integration for Wicked Engine
 class NoesisRenderPath : public wi::RenderPath3D {
@@ -72,9 +72,9 @@ class NoesisRenderPath : public wi::RenderPath3D {
     Noesis::Ptr<Noesis::FrameworkElement> rootElement; // Root element from XAML
 
     // Gameplay subsystems
-    DialogueSystem dialogueSystem;
-    CaseboardSystem caseboardSystem;
-    CameraSystem cameraSystem;
+    DialogueMode dialogueSystem;
+    CaseboardMode caseboardSystem;
+    PhotoMode cameraSystem;
     GameStartup gameStartup;
 
     ID3D12Fence *frameFence = nullptr;
@@ -84,9 +84,9 @@ class NoesisRenderPath : public wi::RenderPath3D {
     bool inMainMenuMode = true;
 
     // Camera tracking (shared between modes)
-    float cameraHorizontal = 0.0f;  // Camera yaw angle
-    float cameraVertical = 0.3f;    // Camera pitch angle
-    float cameraDistance = 2.5f;    // Camera distance from player
+    float cameraHorizontal = 0.0f;        // Camera yaw angle
+    float cameraVertical = 0.3f;          // Camera pitch angle
+    float cameraDistance = 2.5f;          // Camera distance from player
     float cameraHorizontalOffset = 0.25f; // Over-the-shoulder horizontal offset
 
     // Aim dot (reticle) - raycast from character's eye in camera direction

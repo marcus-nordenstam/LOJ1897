@@ -1,4 +1,4 @@
-#include "CaseboardSystem.h"
+#include "CaseboardMode.h"
 
 #include <NsDrawing/Color.h>
 #include <NsDrawing/Thickness.h>
@@ -16,8 +16,8 @@
 
 #include <algorithm>
 
-void CaseboardSystem::Initialize(Noesis::Grid *panel, Noesis::Panel *content,
-                                 Noesis::TextBlock *debugText, HWND hwnd) {
+void CaseboardMode::Initialize(Noesis::Grid *panel, Noesis::Panel *content,
+                               Noesis::TextBlock *debugText, HWND hwnd) {
     caseboardPanel = Noesis::Ptr<Noesis::Grid>(panel);
     caseboardContent = Noesis::Ptr<Noesis::Panel>(content);
     caseboardDebugText = Noesis::Ptr<Noesis::TextBlock>(debugText);
@@ -39,7 +39,7 @@ void CaseboardSystem::Initialize(Noesis::Grid *panel, Noesis::Panel *content,
     }
 }
 
-void CaseboardSystem::Shutdown() {
+void CaseboardMode::Shutdown() {
     caseboardPanel.Reset();
     caseboardContent.Reset();
     caseboardDebugText.Reset();
@@ -50,7 +50,7 @@ void CaseboardSystem::Shutdown() {
     capturedPhotoTextures.clear();
 }
 
-void CaseboardSystem::EnterCaseboardMode() {
+void CaseboardMode::EnterCaseboardMode() {
     if (inCaseboardMode)
         return;
 
@@ -105,7 +105,7 @@ void CaseboardSystem::EnterCaseboardMode() {
     wi::backlog::post("Entered caseboard mode\n");
 }
 
-void CaseboardSystem::ExitCaseboardMode() {
+void CaseboardMode::ExitCaseboardMode() {
     if (!inCaseboardMode)
         return;
 
@@ -130,7 +130,7 @@ void CaseboardSystem::ExitCaseboardMode() {
     wi::backlog::post("Exited caseboard mode\n");
 }
 
-void CaseboardSystem::UpdateCaseboardTransforms() {
+void CaseboardMode::UpdateCaseboardTransforms() {
     if (caseboardZoomTransform) {
         caseboardZoomTransform->SetScaleX(caseboardZoom);
         caseboardZoomTransform->SetScaleY(caseboardZoom);
@@ -142,7 +142,7 @@ void CaseboardSystem::UpdateCaseboardTransforms() {
     UpdateCaseboardDebugText();
 }
 
-void CaseboardSystem::UpdateCaseboardDebugText() {
+void CaseboardMode::UpdateCaseboardDebugText() {
     if (!caseboardDebugText)
         return;
 
@@ -158,7 +158,7 @@ void CaseboardSystem::UpdateCaseboardDebugText() {
     caseboardDebugText->SetText(debugStr);
 }
 
-void CaseboardSystem::CaseboardZoom(int x, int y, float delta) {
+void CaseboardMode::CaseboardZoom(int x, int y, float delta) {
     if (!inCaseboardMode)
         return;
 
@@ -185,7 +185,7 @@ void CaseboardSystem::CaseboardZoom(int x, int y, float delta) {
     UpdateCaseboardTransforms();
 }
 
-void CaseboardSystem::CaseboardPanStart(int x, int y) {
+void CaseboardMode::CaseboardPanStart(int x, int y) {
     if (!inCaseboardMode)
         return;
 
@@ -242,12 +242,12 @@ void CaseboardSystem::CaseboardPanStart(int x, int y) {
     caseboardLastMousePos.y = y;
 }
 
-void CaseboardSystem::CaseboardPanEnd() {
+void CaseboardMode::CaseboardPanEnd() {
     caseboardPanning = false;
     StopDraggingNoteCard();
 }
 
-void CaseboardSystem::ClampCaseboardPan() {
+void CaseboardMode::ClampCaseboardPan() {
     if (!windowHandle)
         return;
 
@@ -276,7 +276,7 @@ void CaseboardSystem::ClampCaseboardPan() {
     }
 }
 
-void CaseboardSystem::CaseboardPanMove(int x, int y) {
+void CaseboardMode::CaseboardPanMove(int x, int y) {
     if (!inCaseboardMode)
         return;
 
@@ -317,7 +317,7 @@ void CaseboardSystem::CaseboardPanMove(int x, int y) {
     }
 }
 
-void CaseboardSystem::AddNoteCard() {
+void CaseboardMode::AddNoteCard() {
     if (!inCaseboardMode || !caseboardContent)
         return;
 
@@ -390,7 +390,7 @@ void CaseboardSystem::AddNoteCard() {
     wi::backlog::post(buf);
 }
 
-void CaseboardSystem::FinalizeNoteCardEdit() {
+void CaseboardMode::FinalizeNoteCardEdit() {
     if (editingNoteCardIndex < 0 || editingNoteCardIndex >= (int)noteCards.size())
         return;
 
@@ -435,13 +435,13 @@ void CaseboardSystem::FinalizeNoteCardEdit() {
     wi::backlog::post("Finalized note card edit\n");
 }
 
-void CaseboardSystem::OnCaseboardClick() {
+void CaseboardMode::OnCaseboardClick() {
     if (editingNoteCardIndex >= 0) {
         FinalizeNoteCardEdit();
     }
 }
 
-void CaseboardSystem::StartEditingNoteCard(int index) {
+void CaseboardMode::StartEditingNoteCard(int index) {
     if (index < 0 || index >= (int)noteCards.size())
         return;
 
@@ -485,7 +485,7 @@ void CaseboardSystem::StartEditingNoteCard(int index) {
     wi::backlog::post("Started editing existing note card\n");
 }
 
-int CaseboardSystem::HitTestNoteCardDragArea(float boardX, float boardY) {
+int CaseboardMode::HitTestNoteCardDragArea(float boardX, float boardY) {
     for (int i = (int)noteCards.size() - 1; i >= 0; i--) {
         NoteCard &card = noteCards[i];
 
@@ -511,7 +511,7 @@ int CaseboardSystem::HitTestNoteCardDragArea(float boardX, float boardY) {
     return -1;
 }
 
-void CaseboardSystem::StartDraggingNoteCard(int index, float boardX, float boardY) {
+void CaseboardMode::StartDraggingNoteCard(int index, float boardX, float boardY) {
     if (index < 0 || index >= (int)noteCards.size())
         return;
 
@@ -528,7 +528,7 @@ void CaseboardSystem::StartDraggingNoteCard(int index, float boardX, float board
     wi::backlog::post("Started dragging note card\n");
 }
 
-void CaseboardSystem::UpdateDraggingNoteCard(float boardX, float boardY) {
+void CaseboardMode::UpdateDraggingNoteCard(float boardX, float boardY) {
     if (draggingNoteCardIndex < 0 || draggingNoteCardIndex >= (int)noteCards.size())
         return;
 
@@ -543,14 +543,14 @@ void CaseboardSystem::UpdateDraggingNoteCard(float boardX, float boardY) {
     }
 }
 
-void CaseboardSystem::StopDraggingNoteCard() {
+void CaseboardMode::StopDraggingNoteCard() {
     if (draggingNoteCardIndex >= 0) {
         wi::backlog::post("Stopped dragging note card\n");
     }
     draggingNoteCardIndex = -1;
 }
 
-void CaseboardSystem::AddPhotoCard(const std::string &photoFilename, int photoNumber) {
+void CaseboardMode::AddPhotoCard(const std::string &photoFilename, int photoNumber) {
     if (!caseboardContent) {
         wi::backlog::post("AddPhotoCard: caseboardContent is null!\n");
         return;
@@ -597,8 +597,7 @@ void CaseboardSystem::AddPhotoCard(const std::string &photoFilename, int photoNu
     std::string labelText = "Photo #" + std::to_string(photoNumber);
     photoLabel->SetText(labelText.c_str());
     photoLabel->SetFontSize(10.0f);
-    photoLabel->SetForeground(
-        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(100, 80, 60)));
+    photoLabel->SetForeground(Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(100, 80, 60)));
     photoLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
     photoLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Bottom);
     photoLabel->SetMargin(Noesis::Thickness(0, 0, 0, 6));

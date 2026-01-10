@@ -1,4 +1,4 @@
-#include "DialogueSystem.h"
+#include "DialogueMode.h"
 
 #include <NsDrawing/Color.h>
 #include <NsDrawing/Thickness.h>
@@ -10,9 +10,9 @@
 #include <NsGui/TextProperties.h>
 #include <NsGui/UIElementCollection.h>
 
-void DialogueSystem::Initialize(Noesis::Grid *panelRoot, Noesis::ScrollViewer *scrollViewer,
-                                Noesis::StackPanel *list, Noesis::TextBox *input,
-                                Noesis::TextBlock *hintText, Noesis::FrameworkElement *indicator) {
+void DialogueMode::Initialize(Noesis::Grid *panelRoot, Noesis::ScrollViewer *scrollViewer,
+                              Noesis::StackPanel *list, Noesis::TextBox *input,
+                              Noesis::TextBlock *hintText, Noesis::FrameworkElement *indicator) {
     dialoguePanelRoot = Noesis::Ptr<Noesis::Grid>(panelRoot);
     dialogueScrollViewer = Noesis::Ptr<Noesis::ScrollViewer>(scrollViewer);
     dialogueList = Noesis::Ptr<Noesis::StackPanel>(list);
@@ -21,7 +21,7 @@ void DialogueSystem::Initialize(Noesis::Grid *panelRoot, Noesis::ScrollViewer *s
     talkIndicator = Noesis::Ptr<Noesis::FrameworkElement>(indicator);
 }
 
-void DialogueSystem::Shutdown() {
+void DialogueMode::Shutdown() {
     dialoguePanelRoot.Reset();
     dialogueScrollViewer.Reset();
     dialogueList.Reset();
@@ -30,8 +30,8 @@ void DialogueSystem::Shutdown() {
     talkIndicator.Reset();
 }
 
-void DialogueSystem::EnterDialogueMode(wi::ecs::Entity npcEntity, wi::scene::Scene &scene,
-                                       Noesis::IView *uiView) {
+void DialogueMode::EnterDialogueMode(wi::ecs::Entity npcEntity, wi::scene::Scene &scene,
+                                     Noesis::IView *uiView) {
     if (inDialogueMode)
         return;
 
@@ -80,7 +80,7 @@ void DialogueSystem::EnterDialogueMode(wi::ecs::Entity npcEntity, wi::scene::Sce
     wi::backlog::post(buffer);
 }
 
-void DialogueSystem::ExitDialogueMode() {
+void DialogueMode::ExitDialogueMode() {
     if (!inDialogueMode)
         return;
 
@@ -105,13 +105,13 @@ void DialogueSystem::ExitDialogueMode() {
     wi::backlog::post("Exited dialogue mode\n");
 }
 
-void DialogueSystem::ClearDialogue() {
+void DialogueMode::ClearDialogue() {
     if (dialogueList) {
         dialogueList->GetChildren()->Clear();
     }
 }
 
-void DialogueSystem::AddDialogueEntry(const std::string &speaker, const std::string &message) {
+void DialogueMode::AddDialogueEntry(const std::string &speaker, const std::string &message) {
     if (!dialogueList)
         return;
 
@@ -159,7 +159,7 @@ void DialogueSystem::AddDialogueEntry(const std::string &speaker, const std::str
     ScrollDialogueToBottom();
 }
 
-void DialogueSystem::ScrollDialogueToBottom() {
+void DialogueMode::ScrollDialogueToBottom() {
     if (dialogueScrollViewer) {
         // Update layout first to ensure new content is measured
         dialogueScrollViewer->UpdateLayout();
@@ -168,7 +168,7 @@ void DialogueSystem::ScrollDialogueToBottom() {
     }
 }
 
-void DialogueSystem::OnDialogueInputCommitted() {
+void DialogueMode::OnDialogueInputCommitted() {
     if (!dialogueInput || !inDialogueMode)
         return;
 
@@ -190,7 +190,7 @@ void DialogueSystem::OnDialogueInputCommitted() {
     // In the future, this would be replaced with actual dialogue system
 }
 
-void DialogueSystem::SetTalkIndicatorVisible(bool visible) {
+void DialogueMode::SetTalkIndicatorVisible(bool visible) {
     if (talkIndicator) {
         talkIndicator->SetVisibility(visible ? Noesis::Visibility_Visible
                                              : Noesis::Visibility_Collapsed);

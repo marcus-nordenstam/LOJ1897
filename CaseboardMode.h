@@ -20,7 +20,7 @@
 class NoesisRenderPath;
 
 // Caseboard system for evidence board management
-class CaseboardSystem {
+class CaseboardMode {
   public:
     // Note cards (player-created notes)
     struct NoteCard {
@@ -43,8 +43,8 @@ class CaseboardSystem {
         std::string labelText;
     };
 
-    CaseboardSystem() = default;
-    ~CaseboardSystem() = default;
+    CaseboardMode() = default;
+    ~CaseboardMode() = default;
 
     // Initialize with UI elements from XAML
     void Initialize(Noesis::Grid *panel, Noesis::Panel *content, Noesis::TextBlock *debugText,

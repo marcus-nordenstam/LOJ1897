@@ -19,15 +19,15 @@ endif ()
 
 # Source files
 set(SOURCE_FILES
-        main.cpp
+        main.cc
         NoesisRenderPath.h
         NoesisRenderPath.cc
-        DialogueSystem.h
-        DialogueSystem.cc
-        CaseboardSystem.h
-        CaseboardSystem.cc
-        CameraSystem.h
-        CameraSystem.cc
+        DialogueMode.h
+        DialogueMode.cc
+        CaseboardMode.h
+        CaseboardMode.cc
+        PhotoMode.h
+        PhotoMode.cc
         GameStartup.h
         GameStartup.cc
 )

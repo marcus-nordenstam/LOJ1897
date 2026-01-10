@@ -14,10 +14,10 @@
 class NoesisRenderPath;
 
 // Dialogue system for NPC conversations
-class DialogueSystem {
+class DialogueMode {
   public:
-    DialogueSystem() = default;
-    ~DialogueSystem() = default;
+    DialogueMode() = default;
+    ~DialogueMode() = default;
 
     // Initialize with UI elements from XAML
     void Initialize(Noesis::Grid *panelRoot, Noesis::ScrollViewer *scrollViewer,
