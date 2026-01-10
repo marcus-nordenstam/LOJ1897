@@ -101,6 +101,38 @@ void NoesisRenderPath::ExitCameraMode() {
     SetThirdPersonMode(true);
 }
 
+void NoesisRenderPath::EnterCameraModeForCaseFile(wi::ecs::Entity npcEntity) {
+    if (cameraSystem.IsActive() || dialogueSystem.IsActive() || caseboardSystem.IsActive() ||
+        inMainMenuMode)
+        return;
+
+    wi::scene::Scene &scene = wi::scene::GetScene();
+
+    // Get NPC name
+    std::string npcName = "Unknown NPC";
+    const wi::scene::NameComponent *nameComp = scene.names.GetComponent(npcEntity);
+    if (nameComp) {
+        npcName = nameComp->name;
+    }
+
+    char buf[256];
+    sprintf_s(buf, "Creating case-file for NPC: %s\n", npcName.c_str());
+    wi::backlog::post(buf);
+
+    cameraSystem.EnterCameraModeForCaseFile(gameStartup.GetPlayerCharacter(), scene, npcName);
+
+    // Hide talk indicator
+    dialogueSystem.SetTalkIndicatorVisible(false);
+
+    // Hide aim dot
+    aimDotVisible = false;
+
+    // Exit third-person mode first (to properly manage cursor visibility)
+    SetThirdPersonMode(false);
+    // Then switch to first-person camera
+    SetFirstPersonMode(true);
+}
+
 void NoesisRenderPath::TakePhoto() {
     cameraSystem.TakePhoto();
 }
@@ -156,6 +188,11 @@ bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
     case Noesis::Key_T:
         if (aimedNPCEntity != wi::ecs::INVALID_ENTITY) {
             EnterDialogueMode(aimedNPCEntity);
+        }
+        return true;
+    case Noesis::Key_F:
+        if (aimedNPCEntity != wi::ecs::INVALID_ENTITY) {
+            EnterCameraModeForCaseFile(aimedNPCEntity);
         }
         return true;
     case Noesis::Key_C:
@@ -617,6 +654,7 @@ void NoesisRenderPath::PostRender() {
     RenderPath3D::PostRender();
 
     if (cameraSystem.IsCaptureRequestPending()) {
+        bool wasCreatingCaseFile = cameraSystem.IsCreatingCaseFile();
         cameraSystem.ClearCaptureRequest();
 
         wi::graphics::GraphicsDevice *device = wi::graphics::GetDevice();
@@ -624,6 +662,12 @@ void NoesisRenderPath::PostRender() {
         device->WaitForGPU();
 
         cameraSystem.CaptureFrameToMemory(this);
+
+        // Auto-exit camera mode after creating case-file
+        if (wasCreatingCaseFile) {
+            wi::backlog::post("Auto-exiting camera mode after case-file creation\n");
+            ExitCameraMode();
+        }
     }
 }
 

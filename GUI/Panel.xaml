@@ -134,34 +134,64 @@
 
     <!-- Talk Indicator (shown when aiming at NPC, outside MenuContainer) -->
     <StackPanel x:Name="TalkIndicator"
-                Orientation="Horizontal"
+                Orientation="Vertical"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Margin="40,0,0,0"
                 Visibility="Collapsed">
-        <!-- Black circle with T -->
-        <Grid Width="28" Height="28" Margin="0,0,8,0">
-            <Ellipse Fill="#E0000000"/>
-            <TextBlock Text="T"
-                       FontSize="16"
-                       FontWeight="Bold"
+        <!-- Talk option -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <!-- Black circle with T -->
+            <Grid Width="28" Height="28" Margin="0,0,8,0">
+                <Ellipse Fill="#E0000000"/>
+                <TextBlock Text="T"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center">
+                    <TextBlock.Effect>
+                        <DropShadowEffect ShadowDepth="0" BlurRadius="0"/>
+                    </TextBlock.Effect>
+                </TextBlock>
+            </Grid>
+            <!-- Talk text -->
+            <TextBlock Text="Talk"
+                       FontSize="18"
                        Foreground="White"
-                       HorizontalAlignment="Center"
                        VerticalAlignment="Center">
                 <TextBlock.Effect>
-                    <DropShadowEffect ShadowDepth="0" BlurRadius="0"/>
+                    <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
                 </TextBlock.Effect>
             </TextBlock>
-        </Grid>
-        <!-- Talk text -->
-        <TextBlock Text="Talk"
-                   FontSize="18"
-                   Foreground="White"
-                   VerticalAlignment="Center">
-            <TextBlock.Effect>
-                <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
-            </TextBlock.Effect>
-        </TextBlock>
+        </StackPanel>
+        
+        <!-- Case-file option -->
+        <StackPanel Orientation="Horizontal">
+            <!-- Black circle with F -->
+            <Grid Width="28" Height="28" Margin="0,0,8,0">
+                <Ellipse Fill="#E0000000"/>
+                <TextBlock Text="F"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center">
+                    <TextBlock.Effect>
+                        <DropShadowEffect ShadowDepth="0" BlurRadius="0"/>
+                    </TextBlock.Effect>
+                </TextBlock>
+            </Grid>
+            <!-- Case-file text -->
+            <TextBlock Text="Case-file"
+                       FontSize="18"
+                       Foreground="White"
+                       VerticalAlignment="Center">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
+                </TextBlock.Effect>
+            </TextBlock>
+        </StackPanel>
     </StackPanel>
 
     <!-- Dialogue Panel (shown when talking to NPC) -->
@@ -262,7 +292,7 @@
             
                 <!-- Case Card: VICTIM -->
                 <Image x:Name="CaseCard_Victim"
-                       Source="GUI/Cards/ACC_CARD_VICTIM.png"
+                       Source="GUI/Cards/CASE_CARD_VICTIM.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -272,7 +302,7 @@
                 
                 <!-- Case Card: CAUSE OF DEATH -->
                 <Image x:Name="CaseCard_CauseOfDeath"
-                       Source="GUI/Cards/ACC_CARD_CAUSE OF DEATH.png"
+                       Source="GUI/Cards/MRD_CARD_CAUSE OF DEATH.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -282,7 +312,7 @@
                 
                 <!-- Case Card: TIME AND PLACE -->
                 <Image x:Name="CaseCard_TimePlace"
-                       Source="GUI/Cards/ACC_CARD_TIME AND PLACE.png"
+                       Source="GUI/Cards/MRD_CARD_TIME AND PLACE.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -292,7 +322,7 @@
                 
                 <!-- Case Card: MEANS -->
                 <Image x:Name="CaseCard_Means"
-                       Source="GUI/Cards/ACC_CARD_MEANS.png"
+                       Source="GUI/Cards/MRD_CARD_MEANS.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -302,7 +332,7 @@
                 
                 <!-- Case Card: MOTIVE -->
                 <Image x:Name="CaseCard_Motive"
-                       Source="GUI/Cards/ACC_CARD_MOTIVE.png"
+                       Source="GUI/Cards/CASE_CARD_MOTIVE.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -312,7 +342,7 @@
                 
                 <!-- Case Card: SUSPECT -->
                 <Image x:Name="CaseCard_Suspect"
-                       Source="GUI/Cards/ACC_CARD SUSPECT.png"
+                       Source="GUI/Cards/CASE_CARD SUSPECT.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>

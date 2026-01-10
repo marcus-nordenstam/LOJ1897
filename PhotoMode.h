@@ -35,6 +35,10 @@ class PhotoMode {
     // Enter camera mode
     void EnterCameraMode(wi::ecs::Entity playerEntity, wi::scene::Scene &scene);
 
+    // Enter camera mode for case-file creation (with NPC info)
+    void EnterCameraModeForCaseFile(wi::ecs::Entity playerEntity, wi::scene::Scene &scene,
+                                    const std::string &npcName);
+
     // Exit camera mode
     void ExitCameraMode(wi::scene::Scene &scene);
 
@@ -68,6 +72,9 @@ class PhotoMode {
     // Check if capture is pending (for PostRender)
     bool IsCaptureRequestPending() const { return captureRequestPending; }
     void ClearCaptureRequest() { captureRequestPending = false; }
+
+    // Check if creating case-file (for auto-exit after capture)
+    bool IsCreatingCaseFile() const { return creatingCaseFile; }
 
     // Get photo count
     int GetPhotoCount() const { return photosTaken; }
@@ -115,6 +122,8 @@ class PhotoMode {
     // State
     bool inCameraMode = false;
     int photosTaken = 0;
+    bool creatingCaseFile = false;
+    std::string caseFileNPCName;
 
     // Hidden player objects during camera mode
     std::vector<wi::ecs::Entity> hiddenPlayerObjects;

@@ -1,6 +1,7 @@
 #include "CaseboardMode.h"
 
 #include <NsDrawing/Color.h>
+#include <NsDrawing/CornerRadius.h>
 #include <NsDrawing/Thickness.h>
 #include <NsGui/BitmapImage.h>
 #include <NsGui/Border.h>
@@ -245,6 +246,28 @@ void CaseboardMode::CaseboardPanStart(int x, int y) {
         return;
     }
 
+    // Check if clicking on a case-file
+    int caseFileIndex = HitTestCaseFile(boardClickX, boardClickY);
+    if (caseFileIndex >= 0) {
+        CaseFile &file = caseFiles[caseFileIndex];
+        float fileLeft = file.boardX - file.width / 2.0f;
+        float fileTop = file.boardY - file.height / 2.0f;
+        float localX = boardClickX - fileLeft;
+        float localY = boardClickY - fileTop;
+
+        // Check if clicking on the tab area (right side)
+        float tabStartX = file.width - 20.5f; // Tab starts at this X position (tabWidth + margin)
+
+        if (localX >= tabStartX) {
+            // Clicked on tab - navigate to next page
+            HandleCaseFileClick(caseFileIndex, localX, localY);
+        } else {
+            // Clicked on main area - start dragging
+            StartDraggingCaseFile(caseFileIndex, boardClickX, boardClickY);
+        }
+        return;
+    }
+
     caseboardPanning = true;
     caseboardLastMousePos.x = x;
     caseboardLastMousePos.y = y;
@@ -254,6 +277,7 @@ void CaseboardMode::CaseboardPanEnd() {
     caseboardPanning = false;
     StopDraggingNoteCard();
     StopDraggingPhotoCard();
+    StopDraggingCaseFile();
 }
 
 void CaseboardMode::ClampCaseboardPan() {
@@ -309,6 +333,13 @@ void CaseboardMode::CaseboardPanMove(int x, int y) {
         return;
     }
 
+    // Handle case-file dragging
+    if (IsDraggingCaseFile()) {
+        UpdateDraggingCaseFile(boardX, boardY);
+        UpdateCaseboardDebugText();
+        return;
+    }
+
     if (caseboardPanning) {
         float deltaX = (float)(x - caseboardLastMousePos.x);
         float deltaY = (float)(y - caseboardLastMousePos.y);
@@ -323,10 +354,12 @@ void CaseboardMode::CaseboardPanMove(int x, int y) {
 
         UpdateCaseboardTransforms();
     } else {
-        // Check if hovering over a note card drag area or photo card for cursor change
+        // Check if hovering over a note card drag area, photo card, or case-file for cursor change
         int hoverCardIndex = HitTestNoteCardDragArea(boardX, boardY);
         int hoverPhotoIndex = HitTestPhotoCard(boardX, boardY);
-        if ((hoverCardIndex >= 0 || hoverPhotoIndex >= 0) && windowHandle) {
+        int hoverCaseFileIndex = HitTestCaseFile(boardX, boardY);
+        if ((hoverCardIndex >= 0 || hoverPhotoIndex >= 0 || hoverCaseFileIndex >= 0) &&
+            windowHandle) {
             SetCursor(LoadCursor(NULL, IDC_HAND));
         }
 
@@ -620,6 +653,239 @@ void CaseboardMode::StopDraggingPhotoCard() {
     draggingPhotoCardIndex = -1;
 }
 
+void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::string &npcName) {
+    if (!caseboardContent) {
+        wi::backlog::post("AddCaseFile: caseboardContent is null!\n");
+        return;
+    }
+
+    wi::backlog::post("AddCaseFile: Creating case-file...\n");
+
+    // Calculate position in board space (offset from photo cards)
+    float boardX = -500.0f + (caseFiles.size() % 5) * 210.0f;
+    float boardY = -400.0f + (caseFiles.size() / 5) * 280.0f;
+
+    // Case-file dimensions (same width as case cards: 180px)
+    const float fileWidth = 180.0f;
+    const float fileHeight = 232.0f; // Maintain similar aspect ratio
+    const float tabWidth = 20.0f;    // Width of the tab on the right edge
+    const float tabHeight = 140.0f;  // 60% of file height
+
+    // Create the case-file container
+    Noesis::Ptr<Noesis::Canvas> fileContainer = *new Noesis::Canvas();
+    fileContainer->SetWidth(fileWidth + tabWidth);
+    fileContainer->SetHeight(fileHeight);
+
+    // Layer 1: Yellow background with rounded right edge
+    Noesis::Ptr<Noesis::Border> fileBackground = *new Noesis::Border();
+    fileBackground->SetWidth(fileWidth);
+    fileBackground->SetHeight(fileHeight);
+    fileBackground->SetBackground(
+        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(255, 235, 120))); // Yellow
+    fileBackground->SetBorderBrush(
+        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(180, 160, 80)));
+    fileBackground->SetBorderThickness(Noesis::Thickness(2.0f));
+    fileBackground->SetCornerRadius(Noesis::CornerRadius(0, 8.0f, 8.0f, 0)); // Rounded right edge
+    Noesis::Canvas::SetLeft(fileBackground, 0);
+    Noesis::Canvas::SetTop(fileBackground, 0);
+    fileContainer->GetChildren()->Add(fileBackground);
+
+    // Layer 2: Tab (rectangle with triangle)
+    Noesis::Ptr<Noesis::Border> fileTab = *new Noesis::Border();
+    fileTab->SetWidth(tabWidth);
+    fileTab->SetHeight(tabHeight);
+    fileTab->SetBackground(Noesis::MakePtr<Noesis::SolidColorBrush>(
+        Noesis::Color(255, 220, 100))); // Slightly darker yellow
+    fileTab->SetBorderBrush(Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(180, 160, 80)));
+    fileTab->SetBorderThickness(Noesis::Thickness(2.0f, 2.0f, 0, 2.0f));
+    fileTab->SetCornerRadius(Noesis::CornerRadius(0, 6.0f, 6.0f, 0)); // Rounded right edge
+    Noesis::Canvas::SetLeft(fileTab, fileWidth - 0.5f);               // Overlap slightly
+    Noesis::Canvas::SetTop(fileTab, fileHeight * 0.2f);               // Start 20% down
+    fileContainer->GetChildren()->Add(fileTab);
+
+    // Layer 2b: Triangle on tab pointing right (simple arrow using text)
+    Noesis::Ptr<Noesis::TextBlock> tabArrow = *new Noesis::TextBlock();
+    tabArrow->SetText("▶"); // Right-pointing triangle
+    tabArrow->SetFontSize(14.0f);
+    tabArrow->SetForeground(
+        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C))); // Dark ink
+    tabArrow->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
+    tabArrow->SetVerticalAlignment(Noesis::VerticalAlignment_Center);
+    Noesis::Canvas::SetLeft(tabArrow, fileWidth - 0.5f + tabWidth / 2.0f - 7.0f);
+    Noesis::Canvas::SetTop(tabArrow, fileHeight * 0.2f + tabHeight / 2.0f - 7.0f);
+    fileContainer->GetChildren()->Add(tabArrow);
+
+    // Layer 3: Photo image (smaller, centered on yellow background)
+    const float photoMarginH = 10.0f;     // Horizontal margin
+    const float photoMarginBottom = 10.0f; // Bottom margin
+    const float photoAreaTop = 35.0f;      // Leave space for NPC name
+    const float photoAreaHeight = fileHeight - photoAreaTop - photoMarginBottom;
+
+    Noesis::Ptr<Noesis::Grid> photoImageContainer = *new Noesis::Grid();
+    photoImageContainer->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
+    photoImageContainer->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
+    photoImageContainer->SetMargin(
+        Noesis::Thickness(photoMarginH, photoAreaTop, photoMarginH + tabWidth, photoMarginBottom));
+
+    Noesis::Ptr<Noesis::Image> photoImage = *new Noesis::Image();
+    Noesis::Ptr<Noesis::BitmapImage> photoBitmap = *new Noesis::BitmapImage();
+    photoBitmap->SetUriSource(Noesis::Uri(photoFilename.c_str()));
+    photoImage->SetSource(photoBitmap);
+    photoImage->SetStretch(Noesis::Stretch_Uniform);
+    photoImage->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
+    photoImage->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
+    photoImageContainer->GetChildren()->Add(photoImage);
+    Noesis::Canvas::SetLeft(photoImageContainer, 0);
+    Noesis::Canvas::SetTop(photoImageContainer, 0);
+    fileContainer->GetChildren()->Add(photoImageContainer);
+
+    // Layer 4: NPC Name label at the top
+    Noesis::Ptr<Noesis::TextBlock> npcLabel = *new Noesis::TextBlock();
+    npcLabel->SetText(npcName.c_str());
+    npcLabel->SetFontSize(16.0f);
+    npcLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Opera-Lyrics-Smooth"));
+    npcLabel->SetForeground(
+        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C))); // Dark ink
+    npcLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
+    npcLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
+    npcLabel->SetTextAlignment(Noesis::TextAlignment_Center);
+    npcLabel->SetEffect(nullptr);
+    npcLabel->SetFontWeight(Noesis::FontWeight_Bold);
+    Noesis::Canvas::SetLeft(npcLabel, photoMarginH);
+    Noesis::Canvas::SetTop(npcLabel, 8.0f);
+    Noesis::Canvas::SetRight(npcLabel, photoMarginH + tabWidth);
+    fileContainer->GetChildren()->Add(npcLabel);
+
+    // Add drop shadow effect to entire file
+    Noesis::Ptr<Noesis::DropShadowEffect> shadowEffect = *new Noesis::DropShadowEffect();
+    shadowEffect->SetColor(Noesis::Color(0, 0, 0));
+    shadowEffect->SetOpacity(0.6f);
+    shadowEffect->SetBlurRadius(12.0f);
+    shadowEffect->SetShadowDepth(5.0f);
+    fileContainer->SetEffect(shadowEffect);
+
+    // Position on canvas (center the file at boardX, boardY)
+    Noesis::Canvas::SetLeft(fileContainer, boardX - (fileWidth + tabWidth) / 2.0f);
+    Noesis::Canvas::SetTop(fileContainer, boardY - fileHeight / 2.0f);
+
+    // Add to caseboard
+    Noesis::UIElementCollection *children = caseboardContent->GetChildren();
+    if (children) {
+        children->Add(fileContainer);
+        char buf[128];
+        sprintf_s(buf, "AddCaseFile: Added to caseboard, now has %d children\n", children->Count());
+        wi::backlog::post(buf);
+    } else {
+        wi::backlog::post("AddCaseFile: Could not get children collection!\n");
+    }
+
+    // Store reference
+    CaseFile caseFile;
+    caseFile.container = fileContainer;
+    caseFile.coverPhoto = photoImage;
+    caseFile.npcNameLabel = npcLabel;
+    caseFile.boardX = boardX;
+    caseFile.boardY = boardY;
+    caseFile.npcName = npcName;
+    caseFile.photoFilename = photoFilename;
+    caseFile.width = fileWidth + tabWidth;
+    caseFile.height = fileHeight;
+    caseFile.currentPage = 0;
+    caseFile.isOpen = false;
+
+    // Initialize with some placeholder pages
+    caseFile.pages.push_back("Page 1: Investigation notes...");
+    caseFile.pages.push_back("Page 2: Additional information...");
+    caseFile.pages.push_back("Page 3: Conclusion...");
+
+    caseFiles.push_back(caseFile);
+
+    char buf[256];
+    sprintf_s(buf, "Created case-file for NPC '%s' at board position (%.0f, %.0f)\n",
+              npcName.c_str(), boardX, boardY);
+    wi::backlog::post(buf);
+}
+
+int CaseboardMode::HitTestCaseFile(float boardX, float boardY) {
+    // Check from top to bottom (reverse order for top-most file first)
+    for (int i = (int)caseFiles.size() - 1; i >= 0; i--) {
+        CaseFile &file = caseFiles[i];
+
+        float fileLeft = file.boardX - file.width / 2.0f;
+        float fileTop = file.boardY - file.height / 2.0f;
+        float fileRight = fileLeft + file.width;
+        float fileBottom = fileTop + file.height;
+
+        if (boardX >= fileLeft && boardX <= fileRight && boardY >= fileTop &&
+            boardY <= fileBottom) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void CaseboardMode::HandleCaseFileClick(int caseFileIndex, float localX, float localY) {
+    if (caseFileIndex < 0 || caseFileIndex >= (int)caseFiles.size())
+        return;
+
+    CaseFile &file = caseFiles[caseFileIndex];
+
+    // Clicked on tab - navigate to next page
+    file.currentPage++;
+    if (file.currentPage > (int)file.pages.size()) {
+        file.currentPage = 0; // Wrap back to cover
+    }
+
+    char buf[128];
+    sprintf_s(buf, "Case-file '%s' page changed to: %d\n", file.npcName.c_str(), file.currentPage);
+    wi::backlog::post(buf);
+
+    // Update visual feedback (optional - could show page number or different content)
+    if (file.currentPage == 0) {
+        wi::backlog::post("  Showing cover\n");
+    } else if (file.currentPage <= (int)file.pages.size()) {
+        char pageBuf[256];
+        sprintf_s(pageBuf, "  Showing page %d: %s\n", file.currentPage,
+                  file.pages[file.currentPage - 1].c_str());
+        wi::backlog::post(pageBuf);
+    }
+}
+
+void CaseboardMode::StartDraggingCaseFile(int index, float boardX, float boardY) {
+    if (index < 0 || index >= (int)caseFiles.size())
+        return;
+
+    draggingCaseFileIndex = index;
+    CaseFile &file = caseFiles[index];
+
+    dragOffsetX = boardX - file.boardX;
+    dragOffsetY = boardY - file.boardY;
+
+    wi::backlog::post("Started dragging case-file\n");
+}
+
+void CaseboardMode::UpdateDraggingCaseFile(float boardX, float boardY) {
+    if (draggingCaseFileIndex < 0 || draggingCaseFileIndex >= (int)caseFiles.size())
+        return;
+
+    CaseFile &file = caseFiles[draggingCaseFileIndex];
+
+    file.boardX = boardX - dragOffsetX;
+    file.boardY = boardY - dragOffsetY;
+
+    if (file.container) {
+        Noesis::Canvas::SetLeft(file.container, file.boardX - file.width / 2.0f);
+        Noesis::Canvas::SetTop(file.container, file.boardY - file.height / 2.0f);
+    }
+}
+
+void CaseboardMode::StopDraggingCaseFile() {
+    if (draggingCaseFileIndex >= 0) {
+        wi::backlog::post("Stopped dragging case-file\n");
+    }
+    draggingCaseFileIndex = -1;
+}
+
 void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     if (!caseboardContent) {
         wi::backlog::post("AddPhotoCard: caseboardContent is null!\n");
@@ -655,7 +921,7 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     Noesis::Ptr<Noesis::Image> cardBackground = *new Noesis::Image();
     Noesis::Ptr<Noesis::BitmapImage> cardBgBitmap = *new Noesis::BitmapImage();
     // Use Note_Card.png as the base (it's a generic card design)
-    cardBgBitmap->SetUriSource(Noesis::Uri("GUI/Cards/Note_Card.png"));
+    cardBgBitmap->SetUriSource(Noesis::Uri("GUI/Cards/Evidence_CARD_Base.png"));
     cardBackground->SetSource(cardBgBitmap);
     cardBackground->SetStretch(Noesis::Stretch_Fill);
     cardBackground->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);

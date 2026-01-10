@@ -138,6 +138,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     // Camera system forwarding
     void EnterCameraMode();
+    void EnterCameraModeForCaseFile(wi::ecs::Entity npcEntity);
     void ExitCameraMode();
     void TakePhoto();
     void CameraClick(int x, int y);

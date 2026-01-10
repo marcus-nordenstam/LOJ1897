@@ -3,6 +3,7 @@
 #include "WickedEngine.h"
 
 #include <NsGui/BitmapImage.h>
+#include <NsGui/Canvas.h>
 #include <NsGui/Grid.h>
 #include <NsGui/Image.h>
 #include <NsGui/Panel.h>
@@ -43,6 +44,22 @@ class CaseboardMode {
         std::string labelText;
         float width = 256.0f;
         float height = 320.0f;
+    };
+
+    // Case-file cards (NPC dossiers with multiple pages)
+    struct CaseFile {
+        Noesis::Ptr<Noesis::Canvas> container;
+        Noesis::Ptr<Noesis::Image> coverPhoto;
+        Noesis::Ptr<Noesis::TextBlock> npcNameLabel;
+        std::vector<std::string> pages; // Page content (could be text or image paths)
+        int currentPage = 0; // 0 = cover, 1+ = inside pages
+        bool isOpen = false;
+        float boardX = 0.0f;
+        float boardY = 0.0f;
+        std::string npcName;
+        std::string photoFilename;
+        float width = 200.0f; // 180 + 20 (tab)
+        float height = 232.0f;
     };
 
     CaseboardMode() = default;
@@ -108,11 +125,17 @@ class CaseboardMode {
     // Start dragging a photo card
     void StartDraggingPhotoCard(int index, float boardX, float boardY);
 
+    // Start dragging a case-file
+    void StartDraggingCaseFile(int index, float boardX, float boardY);
+
     // Update dragged note card position
     void UpdateDraggingNoteCard(float boardX, float boardY);
 
     // Update dragged photo card position
     void UpdateDraggingPhotoCard(float boardX, float boardY);
+
+    // Update dragged case-file position
+    void UpdateDraggingCaseFile(float boardX, float boardY);
 
     // Stop dragging
     void StopDraggingNoteCard();
@@ -120,11 +143,17 @@ class CaseboardMode {
     // Stop dragging photo card
     void StopDraggingPhotoCard();
 
+    // Stop dragging case-file
+    void StopDraggingCaseFile();
+
     // Check if currently dragging a note card
     bool IsDraggingNoteCard() const { return draggingNoteCardIndex >= 0; }
 
     // Check if currently dragging a photo card
     bool IsDraggingPhotoCard() const { return draggingPhotoCardIndex >= 0; }
+
+    // Check if currently dragging a case-file
+    bool IsDraggingCaseFile() const { return draggingCaseFileIndex >= 0; }
 
     // Check if caseboard mode is active
     bool IsActive() const { return inCaseboardMode; }
@@ -132,8 +161,20 @@ class CaseboardMode {
     // Add a photo card to the caseboard with the image from file
     void AddPhotoCard(const std::string &photoFilename);
 
+    // Add a case-file to the caseboard with NPC info and photo
+    void AddCaseFile(const std::string &photoFilename, const std::string &npcName);
+
+    // Handle click on case-file to open/navigate pages
+    void HandleCaseFileClick(int caseFileIndex, float localX, float localY);
+
+    // Check if a board position is on a case-file
+    int HitTestCaseFile(float boardX, float boardY);
+
     // Get photo cards (for photo count display)
     const std::vector<PhotoCard> &GetPhotoCards() const { return photoCards; }
+    
+    // Get case files
+    const std::vector<CaseFile> &GetCaseFiles() const { return caseFiles; }
 
     // Callback setter for mode change notifications
     using ModeChangeCallback = std::function<void(bool entering)>;
@@ -150,15 +191,17 @@ class CaseboardMode {
     // Window handle for size calculations
     HWND windowHandle = nullptr;
 
-    // Note cards and photo cards
+    // Note cards, photo cards, and case files
     std::vector<NoteCard> noteCards;
     std::vector<PhotoCard> photoCards;
+    std::vector<CaseFile> caseFiles;
     std::vector<Noesis::Ptr<Noesis::BitmapSource>> capturedPhotoTextures;
 
     // Editing state
     int editingNoteCardIndex = -1;
     int draggingNoteCardIndex = -1;
     int draggingPhotoCardIndex = -1;
+    int draggingCaseFileIndex = -1;
     float dragOffsetX = 0.0f;
     float dragOffsetY = 0.0f;
 

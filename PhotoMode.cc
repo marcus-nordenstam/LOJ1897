@@ -30,6 +30,8 @@ void PhotoMode::EnterCameraMode(wi::ecs::Entity playerEntity, wi::scene::Scene &
         return;
 
     inCameraMode = true;
+    creatingCaseFile = false;
+    caseFileNPCName.clear();
 
     // Hide player character
     hiddenPlayerObjects.clear();
@@ -88,11 +90,82 @@ void PhotoMode::EnterCameraMode(wi::ecs::Entity playerEntity, wi::scene::Scene &
     wi::backlog::post("Entered camera mode\n");
 }
 
+void PhotoMode::EnterCameraModeForCaseFile(wi::ecs::Entity playerEntity, wi::scene::Scene &scene,
+                                           const std::string &npcName) {
+    if (inCameraMode)
+        return;
+
+    inCameraMode = true;
+    creatingCaseFile = true;
+    caseFileNPCName = npcName;
+
+    // Hide player character
+    hiddenPlayerObjects.clear();
+    if (playerEntity != wi::ecs::INVALID_ENTITY) {
+        // Hide the player's own object component
+        wi::scene::ObjectComponent *playerObject = scene.objects.GetComponent(playerEntity);
+        if (playerObject) {
+            playerObject->SetRenderable(false);
+            hiddenPlayerObjects.push_back(playerEntity);
+        }
+
+        // Hide all child entities
+        for (size_t i = 0; i < scene.hierarchy.GetCount(); i++) {
+            wi::ecs::Entity entity = scene.hierarchy.GetEntity(i);
+            wi::scene::HierarchyComponent *hierarchy = scene.hierarchy.GetComponent(entity);
+
+            wi::ecs::Entity parent = hierarchy->parentID;
+            bool isPlayerDescendant = false;
+            while (parent != wi::ecs::INVALID_ENTITY) {
+                if (parent == playerEntity) {
+                    isPlayerDescendant = true;
+                    break;
+                }
+                wi::scene::HierarchyComponent *parentHierarchy =
+                    scene.hierarchy.GetComponent(parent);
+                parent = parentHierarchy ? parentHierarchy->parentID : wi::ecs::INVALID_ENTITY;
+            }
+
+            if (isPlayerDescendant) {
+                wi::scene::ObjectComponent *childObject = scene.objects.GetComponent(entity);
+                if (childObject) {
+                    childObject->SetRenderable(false);
+                    hiddenPlayerObjects.push_back(entity);
+                }
+            }
+        }
+
+        char buf[128];
+        sprintf_s(buf, "EnterCameraModeForCaseFile: Hidden %zu player objects\n",
+                  hiddenPlayerObjects.size());
+        wi::backlog::post(buf);
+    }
+
+    // Show camera panel
+    if (cameraPanel) {
+        cameraPanel->SetVisibility(Noesis::Visibility_Visible);
+    }
+
+    UpdateCameraPhotoCount();
+    UpdateViewfinderLayout();
+
+    // Notify callback
+    if (modeChangeCallback) {
+        modeChangeCallback(true);
+    }
+
+    char buf[128];
+    sprintf_s(buf, "Entered camera mode for case-file (NPC: %s)\n", npcName.c_str());
+    wi::backlog::post(buf);
+}
+
 void PhotoMode::ExitCameraMode(wi::scene::Scene &scene) {
     if (!inCameraMode)
         return;
 
     inCameraMode = false;
+    creatingCaseFile = false;
+    caseFileNPCName.clear();
 
     // Restore player character visibility
     if (!hiddenPlayerObjects.empty()) {
@@ -164,7 +237,7 @@ void PhotoMode::CaptureFrameToMemory(wi::RenderPath3D *renderPath) {
     }
 
     // Step 2: Crop to center 1/3
-    uint32_t cropWidth = texDesc.width / 3;
+    uint32_t cropWidth = texDesc.width / 4;
     uint32_t cropHeight = texDesc.height / 3;
     uint32_t cropX = texDesc.width / 3;
     uint32_t cropY = texDesc.height / 3;
@@ -209,7 +282,18 @@ void PhotoMode::CaptureFrameToMemory(wi::RenderPath3D *renderPath) {
 
     // Add to caseboard if available
     if (caseboardSystem) {
-        caseboardSystem->AddPhotoCard(photo_filename);
+        if (creatingCaseFile && !caseFileNPCName.empty()) {
+            // Create case-file instead of photo card
+            caseboardSystem->AddCaseFile(photo_filename, caseFileNPCName);
+            wi::backlog::post("Created case-file for NPC - exiting camera mode\n");
+
+            // Automatically exit camera mode after creating case-file
+            // This will be handled by the callback in NoesisRenderPath
+            captureRequestPending = false; // Clear flag to prevent double-capture
+        } else {
+            // Create regular photo card
+            caseboardSystem->AddPhotoCard(photo_filename);
+        }
     }
 }
 
