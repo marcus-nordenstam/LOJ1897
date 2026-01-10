@@ -312,10 +312,13 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Capture the current frame to memory (before shutter obscures it)
     void CaptureFrameToMemory();
     
-    // Convert raw GPU texture data to RGBA8 format
+    // Convert raw GPU texture data to RGBA8 format with optional downsampling
     bool ConvertToRGBA8(const wi::vector<uint8_t>& rawData, 
                         const wi::graphics::TextureDesc& desc, 
-                        std::vector<uint8_t>& rgba8Data);
+                        std::vector<uint8_t>& rgba8Data,
+                        uint32_t& outWidth,
+                        uint32_t& outHeight,
+                        uint32_t downsampleFactor = 1);
 
     // Apply sepia filter to pixel data (RGBA format)
     void ApplySepia(std::vector<uint8_t> &pixels, int width, int height);
