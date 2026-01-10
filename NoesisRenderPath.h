@@ -312,13 +312,24 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Capture the current frame to memory (before shutter obscures it)
     void CaptureFrameToMemory();
     
-    // Convert raw GPU texture data to RGBA8 format with optional downsampling
+    // Crop raw texture data in native GPU format
+    void CropRawData(const wi::vector<uint8_t>& srcData,
+                     uint32_t srcWidth, uint32_t srcHeight, uint32_t bytesPerPixel,
+                     uint32_t cropX, uint32_t cropY, uint32_t cropWidth, uint32_t cropHeight,
+                     wi::vector<uint8_t>& dstData);
+    
+    // Convert raw GPU texture data to RGBA8 format
     bool ConvertToRGBA8(const wi::vector<uint8_t>& rawData, 
-                        const wi::graphics::TextureDesc& desc, 
-                        std::vector<uint8_t>& rgba8Data,
-                        uint32_t& outWidth,
-                        uint32_t& outHeight,
-                        uint32_t downsampleFactor = 1);
+                        const wi::graphics::TextureDesc& desc,
+                        uint32_t width, uint32_t height,
+                        std::vector<uint8_t>& rgba8Data);
+    
+    // Downsample RGBA8 data using box filter
+    void DownsampleRGBA8(const std::vector<uint8_t>& srcData,
+                         uint32_t srcWidth, uint32_t srcHeight,
+                         uint32_t downsampleFactor,
+                         std::vector<uint8_t>& dstData,
+                         uint32_t& outWidth, uint32_t& outHeight);
 
     // Apply sepia filter to pixel data (RGBA format)
     void ApplySepia(std::vector<uint8_t> &pixels, int width, int height);
