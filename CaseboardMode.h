@@ -29,7 +29,7 @@ class CaseboardMode {
     // Pin data - each card has one pin for connections
     struct Pin {
         bool hovering = false;
-        float pinOffsetY = 0.0f; // Offset from card center
+        float pinOffsetY = 0.0f;             // Offset from card center
         Noesis::Ptr<Noesis::Image> pinImage; // Reference to pin visual
     };
 
@@ -69,8 +69,8 @@ class CaseboardMode {
     // Testimony cards (recorded NPC dialogue)
     struct TestimonyCard {
         Noesis::Ptr<Noesis::Grid> container;
-        Noesis::Ptr<Noesis::TextBlock> speakerLabel;  // Speaker name at top
-        Noesis::Ptr<Noesis::TextBlock> messageText;   // Message content
+        Noesis::Ptr<Noesis::TextBlock> speakerLabel; // Speaker name at top
+        Noesis::Ptr<Noesis::TextBlock> messageText;  // Message content
         float boardX = 0.0f;
         float boardY = 0.0f;
         std::string speaker;
@@ -94,8 +94,8 @@ class CaseboardMode {
     // Case-file cards (NPC dossiers with multiple pages)
     struct CaseFile {
         Noesis::Ptr<Noesis::Canvas> container;
-        Noesis::Ptr<Noesis::Border> coverBackground; // Yellow background for cover
-        Noesis::Ptr<Noesis::Image> pageBackground; // Notepad background for content pages
+        Noesis::Ptr<Noesis::Border> coverBackground;   // Yellow background for cover
+        Noesis::Ptr<Noesis::Image> pageBackground;     // Notepad background for content pages
         Noesis::Ptr<Noesis::Grid> photoImageContainer; // Container for the cover photo
         Noesis::Ptr<Noesis::Image> coverPhoto;
         Noesis::Ptr<Noesis::TextBlock> npcNameLabel;
@@ -103,7 +103,7 @@ class CaseboardMode {
         Noesis::Ptr<Noesis::Border> leftTab; // Tab for going back (visible when currentPage > 0)
         Noesis::Ptr<Noesis::TextBlock> leftTabArrow;
         std::vector<CaseFilePage> pages; // Pages with fields
-        int currentPage = 0; // 0 = cover, 1+ = inside pages
+        int currentPage = 0;             // 0 = cover, 1+ = inside pages
         bool isOpen = false;
         float boardX = 0.0f;
         float boardY = 0.0f;
@@ -153,6 +153,9 @@ class CaseboardMode {
 
     // Render connections on a canvas (should be called to draw connections UNDER cards)
     void RenderConnections(Noesis::Canvas *canvas);
+
+    // Rebuild UI element order: background, connections, drag preview, cards
+    void RebuildUIOrder();
 
     // Add a note card at the center of the current view
     void AddNoteCard();
@@ -258,13 +261,13 @@ class CaseboardMode {
 
     // Get photo cards (for photo count display)
     const std::vector<PhotoCard> &GetPhotoCards() const { return photoCards; }
-    
+
     // Get case files
     const std::vector<CaseFile> &GetCaseFiles() const { return caseFiles; }
-    
+
     // Get note cards
     const std::vector<NoteCard> &GetNoteCards() const { return noteCards; }
-    
+
     // Get testimony cards
     const std::vector<TestimonyCard> &GetTestimonyCards() const { return testimonyCards; }
 
@@ -276,7 +279,7 @@ class CaseboardMode {
     void CancelConnection();
     bool IsDraggingConnection() const { return draggingConnection; }
     void RemoveConnectionsForCard(int cardType, int cardIndex);
-    
+
     // Callback setter for mode change notifications
     using ModeChangeCallback = std::function<void(bool entering)>;
     void SetModeChangeCallback(ModeChangeCallback callback) { modeChangeCallback = callback; }
@@ -285,10 +288,12 @@ class CaseboardMode {
     // UI elements
     Noesis::Ptr<Noesis::Grid> caseboardPanel;
     Noesis::Ptr<Noesis::Panel> caseboardContent;
-    Noesis::Ptr<Noesis::Canvas> connectionsCanvas; // Canvas for drawing connections UNDER cards
     Noesis::ScaleTransform *caseboardZoomTransform = nullptr;
     Noesis::TranslateTransform *caseboardPanTransform = nullptr;
     Noesis::Ptr<Noesis::TextBlock> caseboardDebugText;
+
+    Noesis::Ptr<Noesis::UIElement> background;
+    Noesis::Ptr<Noesis::UIElement> caseCardsContent;
 
     // Window handle for size calculations
     HWND windowHandle = nullptr;
@@ -322,6 +327,9 @@ class CaseboardMode {
     float dragConnectionX = 0.0f;
     float dragConnectionY = 0.0f;
     Noesis::Ptr<Noesis::Path> dragPreviewPath; // Reusable path for drag preview
+
+    // Rendered connection paths (separate from logical connections)
+    std::vector<Noesis::Ptr<Noesis::Path>> connectionPaths;
 
     // State
     bool inCaseboardMode = false;
