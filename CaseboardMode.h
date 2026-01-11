@@ -25,6 +25,21 @@ class NoesisRenderPath;
 // Caseboard system for evidence board management
 class CaseboardMode {
   public:
+    // Pin data - each card has one pin for connections
+    struct Pin {
+        bool hovering = false;
+        float pinOffsetY = 0.0f; // Offset from card center
+        Noesis::Ptr<Noesis::Image> pinImage; // Reference to pin visual
+    };
+
+    // Connection between two cards
+    struct Connection {
+        int cardAIndex = -1; // Index in respective card array
+        int cardBIndex = -1;
+        int cardAType = -1; // 0=Note, 1=Photo, 2=Testimony, 3=CaseFile
+        int cardBType = -1;
+    };
+
     // Note cards (player-created notes)
     struct NoteCard {
         Noesis::Ptr<Noesis::Grid> container;
@@ -34,6 +49,7 @@ class CaseboardMode {
         float boardY = 0.0f;
         bool isEditing = false;
         std::string savedText;
+        Pin pin;
     };
 
     // Photo cards (captured evidence photos)
@@ -46,6 +62,7 @@ class CaseboardMode {
         std::string labelText;
         float width = 180.0f;  // Same as black cards
         float height = 225.0f; // Maintains 4:5 aspect ratio
+        Pin pin;
     };
 
     // Testimony cards (recorded NPC dialogue)
@@ -59,6 +76,7 @@ class CaseboardMode {
         std::string message;
         float width = 180.0f;  // Same as black cards
         float height = 232.0f; // Same as black cards
+        Pin pin;
     };
 
     // Field in a case-file page (label-value pair)
@@ -92,6 +110,7 @@ class CaseboardMode {
         std::string photoFilename;
         float width = 200.0f; // 180 + 20 (tab)
         float height = 232.0f;
+        Pin pin;
     };
 
     CaseboardMode() = default;
@@ -130,6 +149,9 @@ class CaseboardMode {
 
     // Handle caseboard pan move (mouse move while dragging)
     void CaseboardPanMove(int x, int y);
+
+    // Render connections on a canvas (should be called to draw connections UNDER cards)
+    void RenderConnections(Noesis::Canvas *canvas);
 
     // Add a note card at the center of the current view
     void AddNoteCard();
@@ -238,7 +260,22 @@ class CaseboardMode {
     
     // Get case files
     const std::vector<CaseFile> &GetCaseFiles() const { return caseFiles; }
+    
+    // Get note cards
+    const std::vector<NoteCard> &GetNoteCards() const { return noteCards; }
+    
+    // Get testimony cards
+    const std::vector<TestimonyCard> &GetTestimonyCards() const { return testimonyCards; }
 
+    // Pin and connection management
+    bool HitTestPin(int cardType, int cardIndex, float boardX, float boardY);
+    void StartConnection(int cardType, int cardIndex);
+    void UpdateConnectionDrag(float boardX, float boardY);
+    void EndConnection(float boardX, float boardY);
+    void CancelConnection();
+    bool IsDraggingConnection() const { return draggingConnection; }
+    void RemoveConnectionsForCard(int cardType, int cardIndex);
+    
     // Callback setter for mode change notifications
     using ModeChangeCallback = std::function<void(bool entering)>;
     void SetModeChangeCallback(ModeChangeCallback callback) { modeChangeCallback = callback; }
@@ -247,6 +284,7 @@ class CaseboardMode {
     // UI elements
     Noesis::Ptr<Noesis::Grid> caseboardPanel;
     Noesis::Ptr<Noesis::Panel> caseboardContent;
+    Noesis::Ptr<Noesis::Canvas> connectionsCanvas; // Canvas for drawing connections UNDER cards
     Noesis::ScaleTransform *caseboardZoomTransform = nullptr;
     Noesis::TranslateTransform *caseboardPanTransform = nullptr;
     Noesis::Ptr<Noesis::TextBlock> caseboardDebugText;
@@ -261,6 +299,12 @@ class CaseboardMode {
     std::vector<CaseFile> caseFiles;
     std::vector<Noesis::Ptr<Noesis::BitmapSource>> capturedPhotoTextures;
 
+    // Connections between cards
+    std::vector<Connection> connections;
+
+    // Pin brush for rendering
+    Noesis::Ptr<Noesis::BitmapImage> pinBitmapImage;
+
     // Editing state
     int editingNoteCardIndex = -1;
     int draggingNoteCardIndex = -1;
@@ -269,6 +313,13 @@ class CaseboardMode {
     int draggingCaseFileIndex = -1;
     float dragOffsetX = 0.0f;
     float dragOffsetY = 0.0f;
+
+    // Connection dragging state
+    bool draggingConnection = false;
+    int dragStartCardType = -1; // 0=Note, 1=Photo, 2=Testimony, 3=CaseFile
+    int dragStartCardIndex = -1;
+    float dragConnectionX = 0.0f;
+    float dragConnectionY = 0.0f;
 
     // State
     bool inCaseboardMode = false;
