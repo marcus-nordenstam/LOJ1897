@@ -3,22 +3,34 @@
 #include <NsDrawing/Color.h>
 #include <NsDrawing/Thickness.h>
 #include <NsGui/Border.h>
+#include <NsGui/Button.h>
 #include <NsGui/Enums.h>
 #include <NsGui/FontFamily.h>
 #include <NsGui/FontProperties.h>
 #include <NsGui/SolidColorBrush.h>
 #include <NsGui/TextProperties.h>
 #include <NsGui/UIElementCollection.h>
+#include <NsGui/RoutedEvent.h>
 
 void DialogueMode::Initialize(Noesis::Grid *panelRoot, Noesis::ScrollViewer *scrollViewer,
                               Noesis::StackPanel *list, Noesis::TextBox *input,
-                              Noesis::TextBlock *hintText, Noesis::FrameworkElement *indicator) {
+                              Noesis::TextBlock *hintText, Noesis::FrameworkElement *indicator,
+                              Noesis::StackPanel *recordInd, Noesis::Button *byeBtn) {
     dialoguePanelRoot = Noesis::Ptr<Noesis::Grid>(panelRoot);
     dialogueScrollViewer = Noesis::Ptr<Noesis::ScrollViewer>(scrollViewer);
     dialogueList = Noesis::Ptr<Noesis::StackPanel>(list);
     dialogueInput = Noesis::Ptr<Noesis::TextBox>(input);
     dialogueHintText = Noesis::Ptr<Noesis::TextBlock>(hintText);
     talkIndicator = Noesis::Ptr<Noesis::FrameworkElement>(indicator);
+    recordIndicator = Noesis::Ptr<Noesis::StackPanel>(recordInd);
+    byeButton = Noesis::Ptr<Noesis::Button>(byeBtn);
+    
+    // Set up click handler for Bye button
+    if (byeButton) {
+        byeButton->Click() += [this](Noesis::BaseComponent*, const Noesis::RoutedEventArgs&) {
+            RequestExit();
+        };
+    }
 }
 
 void DialogueMode::Shutdown() {
@@ -28,6 +40,9 @@ void DialogueMode::Shutdown() {
     dialogueInput.Reset();
     dialogueHintText.Reset();
     talkIndicator.Reset();
+    recordIndicator.Reset();
+    byeButton.Reset();
+    dialogueEntries.clear();
 }
 
 void DialogueMode::EnterDialogueMode(wi::ecs::Entity npcEntity, wi::scene::Scene &scene,
@@ -109,6 +124,8 @@ void DialogueMode::ClearDialogue() {
     if (dialogueList) {
         dialogueList->GetChildren()->Clear();
     }
+    dialogueEntries.clear();
+    hoveredEntryIndex = -1;
 }
 
 void DialogueMode::AddDialogueEntry(const std::string &speaker, const std::string &message) {
@@ -155,6 +172,14 @@ void DialogueMode::AddDialogueEntry(const std::string &speaker, const std::strin
     // Add to dialogue list
     dialogueList->GetChildren()->Add(border);
 
+    // Track the entry
+    DialogueEntry entry;
+    entry.speaker = speaker;
+    entry.message = message;
+    entry.borderElement = border;
+    entry.isPlayer = isPlayer;
+    dialogueEntries.push_back(entry);
+
     // Scroll to bottom
     ScrollDialogueToBottom();
 }
@@ -194,5 +219,72 @@ void DialogueMode::SetTalkIndicatorVisible(bool visible) {
     if (talkIndicator) {
         talkIndicator->SetVisibility(visible ? Noesis::Visibility_Visible
                                              : Noesis::Visibility_Collapsed);
+    }
+}
+
+void DialogueMode::UpdateDialogueHover(int mouseX, int mouseY) {
+    hoveredEntryIndex = -1;
+
+    if (!inDialogueMode || !dialogueList) {
+        if (recordIndicator) {
+            recordIndicator->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        return;
+    }
+
+    // Check each dialogue entry to see if mouse is over it
+    for (size_t i = 0; i < dialogueEntries.size(); ++i) {
+        const DialogueEntry& entry = dialogueEntries[i];
+        if (!entry.borderElement || entry.isPlayer) {
+            continue; // Skip player messages
+        }
+
+        // Get the border's screen position and bounds
+        Noesis::Point screenPos = entry.borderElement->PointToScreen(Noesis::Point(0, 0));
+        float width = entry.borderElement->GetActualWidth();
+        float height = entry.borderElement->GetActualHeight();
+
+        // Check if mouse is over this element
+        if (mouseX >= screenPos.x && mouseX <= screenPos.x + width &&
+            mouseY >= screenPos.y && mouseY <= screenPos.y + height) {
+            hoveredEntryIndex = (int)i;
+            
+            // Position and show record indicator
+            if (recordIndicator) {
+                // Position to the left of the dialogue panel using margin
+                // This positions it in screen space relative to the dialogue entry
+                float indicatorX = screenPos.x - 200.0f;
+                float indicatorY = screenPos.y + (height / 2.0f) - 15.0f;
+                
+                recordIndicator->SetMargin(Noesis::Thickness(indicatorX, indicatorY, 0, 0));
+                recordIndicator->SetVisibility(Noesis::Visibility_Visible);
+            }
+            return;
+        }
+    }
+
+    // No entry hovered, hide indicator
+    if (recordIndicator) {
+        recordIndicator->SetVisibility(Noesis::Visibility_Collapsed);
+    }
+}
+
+const DialogueMode::DialogueEntry* DialogueMode::GetHoveredEntry() const {
+    if (hoveredEntryIndex >= 0 && hoveredEntryIndex < (int)dialogueEntries.size()) {
+        const DialogueEntry& entry = dialogueEntries[hoveredEntryIndex];
+        if (!entry.isPlayer) {
+            return &entry;
+        }
+    }
+    return nullptr;
+}
+
+bool DialogueMode::IsRecordableMessageHovered() const {
+    return GetHoveredEntry() != nullptr;
+}
+
+void DialogueMode::RequestExit() {
+    if (exitRequestCallback) {
+        exitRequestCallback();
     }
 }

@@ -127,6 +127,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     // Dialogue system forwarding
     void EnterDialogueMode(wi::ecs::Entity npcEntity);
     void ExitDialogueMode();
+    void UpdateDialogueHover(int mouseX, int mouseY);
 
     // Caseboard system forwarding
     void EnterCaseboardMode();

@@ -10,7 +10,12 @@
 #include <NsGui/Enums.h>
 #include <NsGui/FontFamily.h>
 #include <NsGui/FontProperties.h>
+#include <NsGui/Grid.h>
+#include <NsGui/Image.h>
+#include <NsGui/RowDefinition.h>
 #include <NsGui/SolidColorBrush.h>
+#include <NsGui/TextBlock.h>
+#include <NsGui/TextBox.h>
 #include <NsGui/TextProperties.h>
 #include <NsGui/TransformGroup.h>
 #include <NsGui/UIElementCollection.h>
@@ -173,7 +178,7 @@ void CaseboardMode::CaseboardZoom(int x, int y, float delta) {
 
     // Apply zoom
     float zoomDelta = delta * 0.001f;
-    caseboardZoom = std::clamp(caseboardZoom + zoomDelta, 0.2f, 4.0f);
+    caseboardZoom = std::clamp(caseboardZoom + zoomDelta, 0.32f, 4.0f);
 
     // Calculate world position under mouse after zoom
     float worldXAfter = (mouseX - caseboardPanX) / caseboardZoom;
@@ -246,6 +251,13 @@ void CaseboardMode::CaseboardPanStart(int x, int y) {
         return;
     }
 
+    // Check if clicking on a testimony card
+    int dragTestimonyIndex = HitTestTestimonyCard(boardClickX, boardClickY);
+    if (dragTestimonyIndex >= 0) {
+        StartDraggingTestimonyCard(dragTestimonyIndex, boardClickX, boardClickY);
+        return;
+    }
+
     // Check if clicking on a case-file
     int caseFileIndex = HitTestCaseFile(boardClickX, boardClickY);
     if (caseFileIndex >= 0) {
@@ -282,6 +294,7 @@ void CaseboardMode::CaseboardPanEnd() {
     caseboardPanning = false;
     StopDraggingNoteCard();
     StopDraggingPhotoCard();
+    StopDraggingTestimonyCard();
     StopDraggingCaseFile();
 }
 
@@ -334,6 +347,13 @@ void CaseboardMode::CaseboardPanMove(int x, int y) {
     // Handle photo card dragging
     if (IsDraggingPhotoCard()) {
         UpdateDraggingPhotoCard(boardX, boardY);
+        UpdateCaseboardDebugText();
+        return;
+    }
+
+    // Handle testimony card dragging
+    if (IsDraggingTestimonyCard()) {
+        UpdateDraggingTestimonyCard(boardX, boardY);
         UpdateCaseboardDebugText();
         return;
     }
@@ -656,6 +676,166 @@ void CaseboardMode::StopDraggingPhotoCard() {
         wi::backlog::post("Stopped dragging photo card\n");
     }
     draggingPhotoCardIndex = -1;
+}
+
+void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::string &message) {
+    if (!caseboardContent) {
+        wi::backlog::post("AddTestimonyCard: caseboardContent is null!\n");
+        return;
+    }
+
+    wi::backlog::post("AddTestimonyCard: Creating testimony card...\n");
+
+    // Calculate position in board space (offset below existing cards)
+    float boardX = 400.0f + testimonyCards.size() * 350.0f;
+    float boardY = 400.0f;
+
+    // Create testimony card
+    TestimonyCard testimony;
+    testimony.speaker = speaker;
+    testimony.message = message;
+    testimony.boardX = boardX;
+    testimony.boardY = boardY;
+
+    // Create container Grid
+    Noesis::Ptr<Noesis::Grid> cardContainer = Noesis::MakePtr<Noesis::Grid>();
+    cardContainer->SetWidth(320.0f);
+    cardContainer->SetHeight(256.0f);
+
+    // Add rows for speaker and message
+    Noesis::Ptr<Noesis::RowDefinition> row0 = Noesis::MakePtr<Noesis::RowDefinition>();
+    row0->SetHeight(Noesis::GridLength(60.0f, Noesis::GridUnitType_Pixel));
+    cardContainer->GetRowDefinitions()->Add(row0);
+    
+    Noesis::Ptr<Noesis::RowDefinition> row1 = Noesis::MakePtr<Noesis::RowDefinition>();
+    row1->SetHeight(Noesis::GridLength(1.0f, Noesis::GridUnitType_Star));
+    cardContainer->GetRowDefinitions()->Add(row1);
+
+    // Background image (Note_Card.png)
+    Noesis::Ptr<Noesis::Image> backgroundImage = Noesis::MakePtr<Noesis::Image>();
+    Noesis::Ptr<Noesis::BitmapImage> bitmapImage = Noesis::MakePtr<Noesis::BitmapImage>();
+    bitmapImage->SetUriSource(Noesis::Uri("GUI/Cards/Note_Card.png"));
+    backgroundImage->SetSource(bitmapImage);
+    backgroundImage->SetStretch(Noesis::Stretch_Fill);
+    Noesis::Grid::SetRowSpan(backgroundImage, 2);
+    cardContainer->GetChildren()->Add(backgroundImage);
+
+    // Speaker label (top, centered, larger font)
+    Noesis::Ptr<Noesis::TextBlock> speakerLabel = Noesis::MakePtr<Noesis::TextBlock>();
+    speakerLabel->SetText(speaker.c_str());
+    speakerLabel->SetFontSize(24.0f);
+    speakerLabel->SetFontWeight(Noesis::FontWeight_Bold);
+    speakerLabel->SetTextWrapping(Noesis::TextWrapping_Wrap);
+    speakerLabel->SetTextAlignment(Noesis::TextAlignment_Center);
+    speakerLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Center);
+    speakerLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
+    speakerLabel->SetMargin(Noesis::Thickness(20, 10, 20, 5));
+    speakerLabel->SetEffect(nullptr); // No shadow
+    
+    // Use Opera Lyrics font
+    Noesis::Ptr<Noesis::FontFamily> fontFamily =
+        Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Opera-Lyrics-Smooth");
+    speakerLabel->SetFontFamily(fontFamily);
+    
+    // Dark color
+    Noesis::Ptr<Noesis::SolidColorBrush> textBrush =
+        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(40, 35, 30));
+    speakerLabel->SetForeground(textBrush);
+    
+    Noesis::Grid::SetRow(speakerLabel, 0);
+    cardContainer->GetChildren()->Add(speakerLabel);
+
+    // Message text (bottom area, wrapped)
+    Noesis::Ptr<Noesis::TextBlock> messageText = Noesis::MakePtr<Noesis::TextBlock>();
+    messageText->SetText(message.c_str());
+    messageText->SetFontSize(16.0f);
+    messageText->SetTextWrapping(Noesis::TextWrapping_Wrap);
+    messageText->SetTextAlignment(Noesis::TextAlignment_Left);
+    messageText->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
+    messageText->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
+    messageText->SetMargin(Noesis::Thickness(25, 10, 25, 20));
+    messageText->SetEffect(nullptr); // No shadow
+    messageText->SetFontFamily(fontFamily);
+    messageText->SetForeground(textBrush);
+    
+    Noesis::Grid::SetRow(messageText, 1);
+    cardContainer->GetChildren()->Add(messageText);
+
+    // Add drop shadow to entire card
+    Noesis::Ptr<Noesis::DropShadowEffect> shadow = Noesis::MakePtr<Noesis::DropShadowEffect>();
+    shadow->SetColor(Noesis::Color(0, 0, 0));
+    shadow->SetBlurRadius(10.0f);
+    shadow->SetShadowDepth(4.0f);
+    shadow->SetOpacity(0.5f);
+    cardContainer->SetEffect(shadow);
+
+    // Position card in board space
+    Noesis::Canvas::SetLeft(cardContainer, boardX - 160.0f);
+    Noesis::Canvas::SetTop(cardContainer, boardY - 128.0f);
+
+    // Add to caseboard content
+    caseboardContent->GetChildren()->Add(cardContainer);
+
+    // Store in testimony cards list
+    testimony.container = cardContainer;
+    testimony.speakerLabel = speakerLabel;
+    testimony.messageText = messageText;
+    testimonyCards.push_back(testimony);
+
+    wi::backlog::post("AddTestimonyCard: Testimony card created successfully!\n");
+}
+
+int CaseboardMode::HitTestTestimonyCard(float boardX, float boardY) {
+    // Check from top to bottom (reverse order for top-most card first)
+    for (int i = (int)testimonyCards.size() - 1; i >= 0; i--) {
+        TestimonyCard &card = testimonyCards[i];
+
+        float cardLeft = card.boardX - card.width / 2.0f;
+        float cardTop = card.boardY - card.height / 2.0f;
+        float cardRight = cardLeft + card.width;
+        float cardBottom = cardTop + card.height;
+
+        if (boardX >= cardLeft && boardX <= cardRight && boardY >= cardTop &&
+            boardY <= cardBottom) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void CaseboardMode::StartDraggingTestimonyCard(int index, float boardX, float boardY) {
+    if (index < 0 || index >= (int)testimonyCards.size())
+        return;
+
+    draggingTestimonyCardIndex = index;
+    TestimonyCard &card = testimonyCards[index];
+
+    dragOffsetX = boardX - card.boardX;
+    dragOffsetY = boardY - card.boardY;
+
+    wi::backlog::post("Started dragging testimony card\n");
+}
+
+void CaseboardMode::UpdateDraggingTestimonyCard(float boardX, float boardY) {
+    if (draggingTestimonyCardIndex < 0 || draggingTestimonyCardIndex >= (int)testimonyCards.size())
+        return;
+
+    TestimonyCard &card = testimonyCards[draggingTestimonyCardIndex];
+
+    card.boardX = boardX - dragOffsetX;
+    card.boardY = boardY - dragOffsetY;
+
+    if (card.container) {
+        Noesis::Canvas::SetLeft(card.container, card.boardX - card.width / 2.0f);
+        Noesis::Canvas::SetTop(card.container, card.boardY - card.height / 2.0f);
+    }
+}
+
+void CaseboardMode::StopDraggingTestimonyCard() {
+    if (draggingTestimonyCardIndex >= 0) {
+        wi::backlog::post("Stopped dragging testimony card\n");
+    }
+    draggingTestimonyCardIndex = -1;
 }
 
 void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::string &npcName) {

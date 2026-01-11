@@ -25,6 +25,10 @@ void NoesisRenderPath::ExitDialogueMode() {
     SetThirdPersonMode(true);
 }
 
+void NoesisRenderPath::UpdateDialogueHover(int mouseX, int mouseY) {
+    dialogueSystem.UpdateDialogueHover(mouseX, mouseY);
+}
+
 // ========== CASEBOARD SYSTEM FORWARDING ==========
 
 void NoesisRenderPath::EnterCaseboardMode() {
@@ -197,6 +201,17 @@ bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
     if (dialogueSystem.IsActive()) {
         if (key == Noesis::Key_Escape) {
             ExitDialogueMode();
+            return true;
+        }
+        // Handle R key for recording testimony
+        if (key == Noesis::Key_R && dialogueSystem.IsRecordableMessageHovered()) {
+            const DialogueMode::DialogueEntry* entry = dialogueSystem.GetHoveredEntry();
+            if (entry) {
+                caseboardSystem.AddTestimonyCard(entry->speaker, entry->message);
+                wi::backlog::post("Recorded testimony from ");
+                wi::backlog::post(entry->speaker.c_str());
+                wi::backlog::post("\n");
+            }
             return true;
         }
         return false;
@@ -829,11 +844,19 @@ void NoesisRenderPath::InitializeNoesis() {
     auto shutterBarBottom =
         FindElementByName<Noesis::FrameworkElement>(rootGrid, "ShutterBarBottom");
     auto cameraPhotoCount = FindElementByName<Noesis::TextBlock>(rootGrid, "CameraPhotoCount");
+    auto recordIndicator = FindElementByName<Noesis::StackPanel>(rootGrid, "RecordIndicator");
+    auto dialogueByeButton = FindElementByName<Noesis::Button>(rootGrid, "DialogueByeButton");
 
     // Initialize subsystems
     dialogueSystem.Initialize(dialoguePanelRoot.GetPtr(), dialogueScrollViewer.GetPtr(),
                               dialogueList.GetPtr(), dialogueInput.GetPtr(),
-                              dialogueHintText.GetPtr(), talkIndicator.GetPtr());
+                              dialogueHintText.GetPtr(), talkIndicator.GetPtr(),
+                              recordIndicator.GetPtr(), dialogueByeButton.GetPtr());
+
+    // Set up dialogue exit callback
+    dialogueSystem.SetExitRequestCallback([this]() {
+        ExitDialogueMode();
+    });
 
     caseboardSystem.Initialize(caseboardPanel.GetPtr(), caseboardContent.GetPtr(),
                                caseboardDebugText.GetPtr(), windowHandle);

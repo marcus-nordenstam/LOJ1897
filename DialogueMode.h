@@ -7,22 +7,35 @@
 #include <NsGui/StackPanel.h>
 #include <NsGui/TextBlock.h>
 #include <NsGui/TextBox.h>
+#include <NsGui/Border.h>
+#include <NsGui/Button.h>
 
 #include <string>
+#include <vector>
 
 // Forward declaration
 class NoesisRenderPath;
+class CaseboardMode;
 
 // Dialogue system for NPC conversations
 class DialogueMode {
   public:
+    // Structure to track dialogue entries
+    struct DialogueEntry {
+        std::string speaker;
+        std::string message;
+        Noesis::Ptr<Noesis::Border> borderElement; // UI element container
+        bool isPlayer = false;
+    };
+
     DialogueMode() = default;
     ~DialogueMode() = default;
 
     // Initialize with UI elements from XAML
     void Initialize(Noesis::Grid *panelRoot, Noesis::ScrollViewer *scrollViewer,
                     Noesis::StackPanel *list, Noesis::TextBox *input, Noesis::TextBlock *hintText,
-                    Noesis::FrameworkElement *talkIndicator);
+                    Noesis::FrameworkElement *talkIndicator, Noesis::StackPanel *recordIndicator,
+                    Noesis::Button *byeButton);
 
     // Shutdown and release UI references
     void Shutdown();
@@ -33,6 +46,9 @@ class DialogueMode {
 
     // Exit dialogue mode
     void ExitDialogueMode();
+
+    // Request exit (triggers callback to NoesisRenderPath)
+    void RequestExit();
 
     // Clear all dialogue entries
     void ClearDialogue();
@@ -58,9 +74,22 @@ class DialogueMode {
     // Show/hide talk indicator
     void SetTalkIndicatorVisible(bool visible);
 
+    // Update hover state for dialogue entries (mouse position in screen space)
+    void UpdateDialogueHover(int mouseX, int mouseY);
+
+    // Get the hovered dialogue entry (returns nullptr if none hovered or if player message)
+    const DialogueEntry* GetHoveredEntry() const;
+
+    // Check if a recordable message is hovered (non-player message)
+    bool IsRecordableMessageHovered() const;
+
     // Callback setter for mode change notifications
     using ModeChangeCallback = std::function<void(bool entering)>;
     void SetModeChangeCallback(ModeChangeCallback callback) { modeChangeCallback = callback; }
+
+    // Callback setter for exit request
+    using ExitRequestCallback = std::function<void()>;
+    void SetExitRequestCallback(ExitRequestCallback callback) { exitRequestCallback = callback; }
 
   private:
     // UI elements
@@ -70,12 +99,19 @@ class DialogueMode {
     Noesis::Ptr<Noesis::TextBox> dialogueInput;
     Noesis::Ptr<Noesis::TextBlock> dialogueHintText;
     Noesis::Ptr<Noesis::FrameworkElement> talkIndicator;
+    Noesis::Ptr<Noesis::StackPanel> recordIndicator; // "R - Record Testimony" indicator
+    Noesis::Ptr<Noesis::Button> byeButton; // Exit dialogue button
 
     // State
     bool inDialogueMode = false;
     wi::ecs::Entity dialogueNPCEntity = wi::ecs::INVALID_ENTITY;
     std::string dialogueNPCName = "NPC";
 
+    // Dialogue entries tracking
+    std::vector<DialogueEntry> dialogueEntries;
+    int hoveredEntryIndex = -1;
+
     // Callback for mode changes
     ModeChangeCallback modeChangeCallback;
+    ExitRequestCallback exitRequestCallback;
 };

@@ -307,6 +307,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                     g_noesisRenderPath->CaseboardPanMove(x, y);
                 }
 
+                // Handle dialogue hover for testimony recording
+                if (g_noesisRenderPath->IsDialogueModeActive()) {
+                    g_noesisRenderPath->UpdateDialogueHover(x, y);
+                }
+
                 g_noesisRenderPath->GetNoesisView()->MouseMove(x, y);
             }
             break;

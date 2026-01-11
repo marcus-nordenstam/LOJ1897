@@ -48,6 +48,19 @@ class CaseboardMode {
         float height = 320.0f;
     };
 
+    // Testimony cards (recorded NPC dialogue)
+    struct TestimonyCard {
+        Noesis::Ptr<Noesis::Grid> container;
+        Noesis::Ptr<Noesis::TextBlock> speakerLabel;  // Speaker name at top
+        Noesis::Ptr<Noesis::TextBlock> messageText;   // Message content
+        float boardX = 0.0f;
+        float boardY = 0.0f;
+        std::string speaker;
+        std::string message;
+        float width = 320.0f;
+        float height = 256.0f;
+    };
+
     // Field in a case-file page (label-value pair)
     struct CaseFileField {
         std::string label;
@@ -138,11 +151,18 @@ class CaseboardMode {
     // Returns the index of the photo card, or -1 if not on any
     int HitTestPhotoCard(float boardX, float boardY);
 
+    // Check if a board position is on a testimony card
+    // Returns the index of the testimony card, or -1 if not on any
+    int HitTestTestimonyCard(float boardX, float boardY);
+
     // Start dragging a note card
     void StartDraggingNoteCard(int index, float boardX, float boardY);
 
     // Start dragging a photo card
     void StartDraggingPhotoCard(int index, float boardX, float boardY);
+
+    // Start dragging a testimony card
+    void StartDraggingTestimonyCard(int index, float boardX, float boardY);
 
     // Start dragging a case-file
     void StartDraggingCaseFile(int index, float boardX, float boardY);
@@ -153,6 +173,9 @@ class CaseboardMode {
     // Update dragged photo card position
     void UpdateDraggingPhotoCard(float boardX, float boardY);
 
+    // Update dragged testimony card position
+    void UpdateDraggingTestimonyCard(float boardX, float boardY);
+
     // Update dragged case-file position
     void UpdateDraggingCaseFile(float boardX, float boardY);
 
@@ -162,6 +185,9 @@ class CaseboardMode {
     // Stop dragging photo card
     void StopDraggingPhotoCard();
 
+    // Stop dragging testimony card
+    void StopDraggingTestimonyCard();
+
     // Stop dragging case-file
     void StopDraggingCaseFile();
 
@@ -170,6 +196,9 @@ class CaseboardMode {
 
     // Check if currently dragging a photo card
     bool IsDraggingPhotoCard() const { return draggingPhotoCardIndex >= 0; }
+
+    // Check if currently dragging a testimony card
+    bool IsDraggingTestimonyCard() const { return draggingTestimonyCardIndex >= 0; }
 
     // Check if currently dragging a case-file
     bool IsDraggingCaseFile() const { return draggingCaseFileIndex >= 0; }
@@ -182,6 +211,9 @@ class CaseboardMode {
 
     // Add a photo card to the caseboard with the image from file
     void AddPhotoCard(const std::string &photoFilename);
+
+    // Add a testimony card to the caseboard with speaker name and message
+    void AddTestimonyCard(const std::string &speaker, const std::string &message);
 
     // Add a case-file to the caseboard with NPC info and photo
     void AddCaseFile(const std::string &photoFilename, const std::string &npcName);
@@ -222,9 +254,10 @@ class CaseboardMode {
     // Window handle for size calculations
     HWND windowHandle = nullptr;
 
-    // Note cards, photo cards, and case files
+    // Note cards, photo cards, testimony cards, and case files
     std::vector<NoteCard> noteCards;
     std::vector<PhotoCard> photoCards;
+    std::vector<TestimonyCard> testimonyCards;
     std::vector<CaseFile> caseFiles;
     std::vector<Noesis::Ptr<Noesis::BitmapSource>> capturedPhotoTextures;
 
@@ -232,6 +265,7 @@ class CaseboardMode {
     int editingNoteCardIndex = -1;
     int draggingNoteCardIndex = -1;
     int draggingPhotoCardIndex = -1;
+    int draggingTestimonyCardIndex = -1;
     int draggingCaseFileIndex = -1;
     float dragOffsetX = 0.0f;
     float dragOffsetY = 0.0f;
