@@ -8,6 +8,7 @@
 #include <NsGui/Grid.h>
 #include <NsGui/Image.h>
 #include <NsGui/Panel.h>
+#include <NsGui/Path.h>
 #include <NsGui/ScaleTransform.h>
 #include <NsGui/StackPanel.h>
 #include <NsGui/TextBlock.h>
@@ -320,6 +321,7 @@ class CaseboardMode {
     int dragStartCardIndex = -1;
     float dragConnectionX = 0.0f;
     float dragConnectionY = 0.0f;
+    Noesis::Ptr<Noesis::Path> dragPreviewPath; // Reusable path for drag preview
 
     // State
     bool inCaseboardMode = false;
