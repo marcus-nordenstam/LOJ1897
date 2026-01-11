@@ -144,6 +144,25 @@ void NoesisRenderPath::CameraClick(int x, int y) {
 // ========== KEYBOARD SHORTCUT HANDLING ==========
 
 bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
+    // Check if user is editing a note card - if so, don't process shortcuts
+    if (caseboardSystem.IsEditingNoteCard()) {
+        // User is typing in a text box - don't process shortcuts
+        return false; // Let the TextBox handle all keys
+    }
+
+    // Additional check: see if any TextBox has keyboard focus
+    if (rootElement) {
+        Noesis::UIElement* focusedElement = Noesis::FocusManager::GetFocusedElement(rootElement);
+        if (focusedElement) {
+            // Check if the focused element is a TextBox
+            Noesis::TextBox* focusedTextBox = Noesis::DynamicCast<Noesis::TextBox*>(focusedElement);
+            if (focusedTextBox) {
+                // User is typing in a text box - don't process shortcuts
+                return false; // Let the TextBox handle all keys
+            }
+        }
+    }
+
     // Handle camera mode shortcuts
     if (cameraSystem.IsActive()) {
         switch (key) {
@@ -742,6 +761,14 @@ bool NoesisRenderPath::MouseWheel(int x, int y, int delta) {
 
     if (caseboardSystem.IsActive()) {
         caseboardSystem.CaseboardZoom(x, y, (float)delta);
+        return true;
+    }
+
+    // Handle third-person camera distance adjustment in normal gameplay
+    if (!inMainMenuMode && !dialogueSystem.IsActive() && !cameraSystem.IsActive()) {
+        // Adjust camera distance (positive delta = zoom in, negative = zoom out)
+        float zoomAmount = delta / 120.0f; // Delta is typically 120 per "notch"
+        cameraDistance = std::max(0.5f, cameraDistance - zoomAmount * 0.5f);
         return true;
     }
 

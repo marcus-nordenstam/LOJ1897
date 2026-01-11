@@ -36,6 +36,7 @@
 #include <NsGui/Image.h>
 #include <NsGui/InputEnums.h>
 #include <NsGui/IntegrationAPI.h>
+#include <NsGui/FocusManager.h>
 #include <NsGui/Panel.h>
 #include <NsGui/ScaleTransform.h>
 #include <NsGui/ScrollViewer.h>

@@ -255,12 +255,17 @@ void CaseboardMode::CaseboardPanStart(int x, int y) {
         float localX = boardClickX - fileLeft;
         float localY = boardClickY - fileTop;
 
-        // Check if clicking on the tab area (right side)
-        float tabStartX = file.width - 20.5f; // Tab starts at this X position (tabWidth + margin)
+        // Check if clicking on the right tab (forward)
+        float rightTabStartX = file.width - 20.5f; // Tab starts at this X position (tabWidth + margin)
+        // Check if clicking on the left tab (backward) - only visible when currentPage > 0
+        float leftTabEndX = 20.5f; // Left tab extends to this X position
 
-        if (localX >= tabStartX) {
-            // Clicked on tab - navigate to next page
+        if (localX >= rightTabStartX) {
+            // Clicked on right tab - navigate to next page
             HandleCaseFileClick(caseFileIndex, localX, localY);
+        } else if (localX <= leftTabEndX && file.currentPage > 0) {
+            // Clicked on left tab - navigate to previous page
+            HandleCaseFileLeftTabClick(caseFileIndex);
         } else {
             // Clicked on main area - start dragging
             StartDraggingCaseFile(caseFileIndex, boardClickX, boardClickY);
@@ -676,44 +681,88 @@ void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::str
     fileContainer->SetWidth(fileWidth + tabWidth);
     fileContainer->SetHeight(fileHeight);
 
-    // Layer 1: Yellow background with rounded right edge
-    Noesis::Ptr<Noesis::Border> fileBackground = *new Noesis::Border();
-    fileBackground->SetWidth(fileWidth);
-    fileBackground->SetHeight(fileHeight);
-    fileBackground->SetBackground(
+    // Layer 1a: Yellow background for cover (with rounded right edge)
+    Noesis::Ptr<Noesis::Border> coverBackground = *new Noesis::Border();
+    coverBackground->SetWidth(fileWidth);
+    coverBackground->SetHeight(fileHeight);
+    coverBackground->SetBackground(
         Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(255, 235, 120))); // Yellow
-    fileBackground->SetBorderBrush(
+    coverBackground->SetBorderBrush(
         Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(180, 160, 80)));
-    fileBackground->SetBorderThickness(Noesis::Thickness(2.0f));
-    fileBackground->SetCornerRadius(Noesis::CornerRadius(0, 8.0f, 8.0f, 0)); // Rounded right edge
-    Noesis::Canvas::SetLeft(fileBackground, 0);
-    Noesis::Canvas::SetTop(fileBackground, 0);
-    fileContainer->GetChildren()->Add(fileBackground);
+    coverBackground->SetBorderThickness(Noesis::Thickness(2.0f));
+    coverBackground->SetCornerRadius(Noesis::CornerRadius(0, 8.0f, 8.0f, 0)); // Rounded right edge
+    Noesis::Canvas::SetLeft(coverBackground, 0);
+    Noesis::Canvas::SetTop(coverBackground, 0);
+    fileContainer->GetChildren()->Add(coverBackground);
 
-    // Layer 2: Tab (rectangle with triangle)
-    Noesis::Ptr<Noesis::Border> fileTab = *new Noesis::Border();
-    fileTab->SetWidth(tabWidth);
-    fileTab->SetHeight(tabHeight);
-    fileTab->SetBackground(Noesis::MakePtr<Noesis::SolidColorBrush>(
+    // Layer 1b: Notepad background for content pages (initially hidden)
+    Noesis::Ptr<Noesis::Image> pageBackground = *new Noesis::Image();
+    Noesis::Ptr<Noesis::BitmapImage> pageBgBitmap = *new Noesis::BitmapImage();
+    pageBgBitmap->SetUriSource(Noesis::Uri("GUI/Cards/Note_Card.png"));
+    pageBackground->SetSource(pageBgBitmap);
+    pageBackground->SetStretch(Noesis::Stretch_Fill);
+    pageBackground->SetWidth(fileWidth);
+    pageBackground->SetHeight(fileHeight);
+    pageBackground->SetVisibility(Noesis::Visibility_Collapsed); // Hidden on cover
+    Noesis::Canvas::SetLeft(pageBackground, 0);
+    Noesis::Canvas::SetTop(pageBackground, 0);
+    fileContainer->GetChildren()->Add(pageBackground);
+
+    // Layer 2a: Right tab (for forward navigation)
+    Noesis::Ptr<Noesis::Border> rightTab = *new Noesis::Border();
+    rightTab->SetWidth(tabWidth);
+    rightTab->SetHeight(tabHeight);
+    rightTab->SetBackground(Noesis::MakePtr<Noesis::SolidColorBrush>(
         Noesis::Color(255, 220, 100))); // Slightly darker yellow
-    fileTab->SetBorderBrush(Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(180, 160, 80)));
-    fileTab->SetBorderThickness(Noesis::Thickness(2.0f, 2.0f, 0, 2.0f));
-    fileTab->SetCornerRadius(Noesis::CornerRadius(0, 6.0f, 6.0f, 0)); // Rounded right edge
-    Noesis::Canvas::SetLeft(fileTab, fileWidth - 0.5f);               // Overlap slightly
-    Noesis::Canvas::SetTop(fileTab, fileHeight * 0.2f);               // Start 20% down
-    fileContainer->GetChildren()->Add(fileTab);
+    rightTab->SetBorderBrush(Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(180, 160, 80)));
+    rightTab->SetBorderThickness(Noesis::Thickness(2.0f, 2.0f, 0, 2.0f));
+    rightTab->SetCornerRadius(Noesis::CornerRadius(0, 6.0f, 6.0f, 0)); // Rounded right edge
+    Noesis::Canvas::SetLeft(rightTab, fileWidth - 0.5f);                // Overlap slightly
+    Noesis::Canvas::SetTop(rightTab, fileHeight * 0.2f);                // Start 20% down
+    fileContainer->GetChildren()->Add(rightTab);
 
-    // Layer 2b: Triangle on tab pointing right (simple arrow using text)
-    Noesis::Ptr<Noesis::TextBlock> tabArrow = *new Noesis::TextBlock();
-    tabArrow->SetText("▶"); // Right-pointing triangle
-    tabArrow->SetFontSize(14.0f);
-    tabArrow->SetForeground(
-        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C))); // Dark ink
-    tabArrow->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
-    tabArrow->SetVerticalAlignment(Noesis::VerticalAlignment_Center);
-    Noesis::Canvas::SetLeft(tabArrow, fileWidth - 0.5f + tabWidth / 2.0f - 7.0f);
-    Noesis::Canvas::SetTop(tabArrow, fileHeight * 0.2f + tabHeight / 2.0f - 7.0f);
-    fileContainer->GetChildren()->Add(tabArrow);
+    // Layer 2b: Triangle on right tab pointing right (centered)
+    Noesis::Ptr<Noesis::TextBlock> rightTabArrow = *new Noesis::TextBlock();
+    rightTabArrow->SetText("▶"); // Right-pointing triangle
+    rightTabArrow->SetFontSize(14.0f);
+    rightTabArrow->SetForeground(
+        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0, 0, 0))); // Black
+    rightTabArrow->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
+    rightTabArrow->SetVerticalAlignment(Noesis::VerticalAlignment_Center);
+    rightTabArrow->SetWidth(tabWidth);
+    rightTabArrow->SetHeight(tabHeight);
+    Noesis::Canvas::SetLeft(rightTabArrow, fileWidth - 0.5f);
+    Noesis::Canvas::SetTop(rightTabArrow, fileHeight * 0.2f);
+    fileContainer->GetChildren()->Add(rightTabArrow);
+
+    // Layer 2c: Left tab (for backward navigation, initially hidden)
+    Noesis::Ptr<Noesis::Border> leftTab = *new Noesis::Border();
+    leftTab->SetWidth(tabWidth);
+    leftTab->SetHeight(tabHeight);
+    leftTab->SetBackground(Noesis::MakePtr<Noesis::SolidColorBrush>(
+        Noesis::Color(255, 220, 100))); // Slightly darker yellow
+    leftTab->SetBorderBrush(Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(180, 160, 80)));
+    leftTab->SetBorderThickness(Noesis::Thickness(0, 2.0f, 2.0f, 2.0f));
+    leftTab->SetCornerRadius(Noesis::CornerRadius(6.0f, 0, 0, 6.0f)); // Rounded left edge
+    Noesis::Canvas::SetLeft(leftTab, -tabWidth + 0.5f);                // Overlap slightly on left
+    Noesis::Canvas::SetTop(leftTab, fileHeight * 0.2f);                // Start 20% down
+    leftTab->SetVisibility(Noesis::Visibility_Collapsed);              // Hidden initially
+    fileContainer->GetChildren()->Add(leftTab);
+
+    // Layer 2d: Triangle on left tab pointing left (centered)
+    Noesis::Ptr<Noesis::TextBlock> leftTabArrow = *new Noesis::TextBlock();
+    leftTabArrow->SetText("◀"); // Left-pointing triangle
+    leftTabArrow->SetFontSize(14.0f);
+    leftTabArrow->SetForeground(
+        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0, 0, 0))); // Black
+    leftTabArrow->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
+    leftTabArrow->SetVerticalAlignment(Noesis::VerticalAlignment_Center);
+    leftTabArrow->SetWidth(tabWidth);
+    leftTabArrow->SetHeight(tabHeight);
+    Noesis::Canvas::SetLeft(leftTabArrow, -tabWidth + 0.5f);
+    Noesis::Canvas::SetTop(leftTabArrow, fileHeight * 0.2f);
+    leftTabArrow->SetVisibility(Noesis::Visibility_Collapsed); // Hidden initially
+    fileContainer->GetChildren()->Add(leftTabArrow);
 
     // Layer 3: Photo image (smaller, centered on yellow background)
     const float photoMarginH = 10.0f;     // Horizontal margin
@@ -739,22 +788,31 @@ void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::str
     Noesis::Canvas::SetTop(photoImageContainer, 0);
     fileContainer->GetChildren()->Add(photoImageContainer);
 
-    // Layer 4: NPC Name label at the top
+    // Layer 4: NPC Name label at the top (on cover page)
     Noesis::Ptr<Noesis::TextBlock> npcLabel = *new Noesis::TextBlock();
     npcLabel->SetText(npcName.c_str());
     npcLabel->SetFontSize(16.0f);
     npcLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Opera-Lyrics-Smooth"));
     npcLabel->SetForeground(
-        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(0x2B, 0x3D, 0x5C))); // Dark ink
+        Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(10, 15, 25))); // Very dark blue, nearly black
     npcLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
     npcLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
     npcLabel->SetTextAlignment(Noesis::TextAlignment_Center);
-    npcLabel->SetEffect(nullptr);
+    npcLabel->SetEffect(nullptr); // No shadow
     npcLabel->SetFontWeight(Noesis::FontWeight_Bold);
     Noesis::Canvas::SetLeft(npcLabel, photoMarginH);
     Noesis::Canvas::SetTop(npcLabel, 8.0f);
     Noesis::Canvas::SetRight(npcLabel, photoMarginH + tabWidth);
     fileContainer->GetChildren()->Add(npcLabel);
+
+    // Layer 5: Page content panel (for displaying fields on pages 1+)
+    Noesis::Ptr<Noesis::StackPanel> pageContentPanel = *new Noesis::StackPanel();
+    pageContentPanel->SetOrientation(Noesis::Orientation_Vertical);
+    pageContentPanel->SetVisibility(Noesis::Visibility_Collapsed); // Hidden on cover
+    Noesis::Canvas::SetLeft(pageContentPanel, photoMarginH);
+    Noesis::Canvas::SetTop(pageContentPanel, photoAreaTop);
+    Noesis::Canvas::SetRight(pageContentPanel, photoMarginH + tabWidth);
+    fileContainer->GetChildren()->Add(pageContentPanel);
 
     // Add drop shadow effect to entire file
     Noesis::Ptr<Noesis::DropShadowEffect> shadowEffect = *new Noesis::DropShadowEffect();
@@ -782,8 +840,14 @@ void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::str
     // Store reference
     CaseFile caseFile;
     caseFile.container = fileContainer;
+    caseFile.coverBackground = coverBackground;
+    caseFile.pageBackground = pageBackground;
+    caseFile.photoImageContainer = photoImageContainer;
     caseFile.coverPhoto = photoImage;
     caseFile.npcNameLabel = npcLabel;
+    caseFile.pageContentPanel = pageContentPanel;
+    caseFile.leftTab = leftTab;
+    caseFile.leftTabArrow = leftTabArrow;
     caseFile.boardX = boardX;
     caseFile.boardY = boardY;
     caseFile.npcName = npcName;
@@ -793,10 +857,8 @@ void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::str
     caseFile.currentPage = 0;
     caseFile.isOpen = false;
 
-    // Initialize with some placeholder pages
-    caseFile.pages.push_back("Page 1: Investigation notes...");
-    caseFile.pages.push_back("Page 2: Additional information...");
-    caseFile.pages.push_back("Page 3: Conclusion...");
+    // Populate with dynamic pages
+    PopulateCaseFilePages(caseFile);
 
     caseFiles.push_back(caseFile);
 
@@ -830,7 +892,7 @@ void CaseboardMode::HandleCaseFileClick(int caseFileIndex, float localX, float l
 
     CaseFile &file = caseFiles[caseFileIndex];
 
-    // Clicked on tab - navigate to next page
+    // Clicked on right tab - navigate to next page
     file.currentPage++;
     if (file.currentPage > (int)file.pages.size()) {
         file.currentPage = 0; // Wrap back to cover
@@ -840,14 +902,141 @@ void CaseboardMode::HandleCaseFileClick(int caseFileIndex, float localX, float l
     sprintf_s(buf, "Case-file '%s' page changed to: %d\n", file.npcName.c_str(), file.currentPage);
     wi::backlog::post(buf);
 
-    // Update visual feedback (optional - could show page number or different content)
+    // Update the visual display
+    UpdateCaseFilePageDisplay(file);
+}
+
+void CaseboardMode::HandleCaseFileLeftTabClick(int caseFileIndex) {
+    if (caseFileIndex < 0 || caseFileIndex >= (int)caseFiles.size())
+        return;
+
+    CaseFile &file = caseFiles[caseFileIndex];
+
+    // Go back one page
+    file.currentPage--;
+    if (file.currentPage < 0) {
+        file.currentPage = 0; // Stay on cover
+    }
+
+    char buf[128];
+    sprintf_s(buf, "Case-file '%s' page changed to: %d (back)\n", file.npcName.c_str(),
+              file.currentPage);
+    wi::backlog::post(buf);
+
+    // Update the visual display
+    UpdateCaseFilePageDisplay(file);
+}
+
+void CaseboardMode::PopulateCaseFilePages(CaseFile &file) {
+    // Page 1: Physical description
+    CaseFilePage page1;
+    page1.fields.push_back({"Name", "Unknown"});
+    page1.fields.push_back({"Date of Birth", "Oct 2, 1865"});
+    page1.fields.push_back({"Height", "6'1\""});
+    page1.fields.push_back({"Weight", "130 lbs"});
+    file.pages.push_back(page1);
+
+    // Page 2: Additional details
+    CaseFilePage page2;
+    page2.fields.push_back({"Eye color", "Blue"});
+    page2.fields.push_back({"Hair color", "Brown"});
+    page2.fields.push_back({"Occupation", "Unknown"});
+    page2.fields.push_back({"Nationality", "Unknown"});
+    page2.fields.push_back({"Accent", "English"});
+    file.pages.push_back(page2);
+}
+
+void CaseboardMode::UpdateCaseFilePageDisplay(CaseFile &file) {
     if (file.currentPage == 0) {
-        wi::backlog::post("  Showing cover\n");
-    } else if (file.currentPage <= (int)file.pages.size()) {
-        char pageBuf[256];
-        sprintf_s(pageBuf, "  Showing page %d: %s\n", file.currentPage,
-                  file.pages[file.currentPage - 1].c_str());
-        wi::backlog::post(pageBuf);
+        // Show cover: yellow background, photo + name visible, page content hidden
+        if (file.coverBackground) {
+            file.coverBackground->SetVisibility(Noesis::Visibility_Visible);
+        }
+        if (file.pageBackground) {
+            file.pageBackground->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        if (file.photoImageContainer) {
+            file.photoImageContainer->SetVisibility(Noesis::Visibility_Visible);
+        }
+        if (file.npcNameLabel) {
+            file.npcNameLabel->SetVisibility(Noesis::Visibility_Visible);
+        }
+        if (file.pageContentPanel) {
+            file.pageContentPanel->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        // Hide left tab on cover
+        if (file.leftTab) {
+            file.leftTab->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        if (file.leftTabArrow) {
+            file.leftTabArrow->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+    } else {
+        // Show page content: notepad background, hide cover elements, show fields
+        if (file.coverBackground) {
+            file.coverBackground->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        if (file.pageBackground) {
+            file.pageBackground->SetVisibility(Noesis::Visibility_Visible);
+        }
+        if (file.photoImageContainer) {
+            file.photoImageContainer->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        if (file.npcNameLabel) {
+            file.npcNameLabel->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+        if (file.pageContentPanel) {
+            file.pageContentPanel->SetVisibility(Noesis::Visibility_Visible);
+
+            // Clear existing content
+            file.pageContentPanel->GetChildren()->Clear();
+
+            // Get the page (currentPage is 1-based for pages)
+            int pageIndex = file.currentPage - 1;
+            if (pageIndex >= 0 && pageIndex < (int)file.pages.size()) {
+                const CaseFilePage &page = file.pages[pageIndex];
+
+                // Add each field (no page title)
+                for (const auto &field : page.fields) {
+                    // Field container
+                    Noesis::Ptr<Noesis::StackPanel> fieldPanel = *new Noesis::StackPanel();
+                    fieldPanel->SetOrientation(Noesis::Orientation_Horizontal);
+                    fieldPanel->SetMargin(Noesis::Thickness(0, 2, 0, 2));
+
+                    // Label
+                    Noesis::Ptr<Noesis::TextBlock> labelText = *new Noesis::TextBlock();
+                    labelText->SetText((field.label + ": ").c_str());
+                    labelText->SetFontSize(10.0f);
+                    labelText->SetFontFamily(
+                        Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Opera-Lyrics-Smooth"));
+                    labelText->SetForeground(Noesis::MakePtr<Noesis::SolidColorBrush>(
+                        Noesis::Color(10, 15, 25))); // Very dark blue, nearly black
+                    labelText->SetFontWeight(Noesis::FontWeight_Bold);
+                    labelText->SetEffect(nullptr); // No shadow
+                    fieldPanel->GetChildren()->Add(labelText);
+
+                    // Value
+                    Noesis::Ptr<Noesis::TextBlock> valueText = *new Noesis::TextBlock();
+                    valueText->SetText(field.value.c_str());
+                    valueText->SetFontSize(10.0f);
+                    valueText->SetFontFamily(
+                        Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Opera-Lyrics-Smooth"));
+                    valueText->SetForeground(Noesis::MakePtr<Noesis::SolidColorBrush>(
+                        Noesis::Color(10, 15, 25))); // Very dark blue, nearly black
+                    valueText->SetEffect(nullptr); // No shadow
+                    fieldPanel->GetChildren()->Add(valueText);
+
+                    file.pageContentPanel->GetChildren()->Add(fieldPanel);
+                }
+            }
+        }
+        // Show left tab when not on cover
+        if (file.leftTab) {
+            file.leftTab->SetVisibility(Noesis::Visibility_Visible);
+        }
+        if (file.leftTabArrow) {
+            file.leftTabArrow->SetVisibility(Noesis::Visibility_Visible);
+        }
     }
 }
 

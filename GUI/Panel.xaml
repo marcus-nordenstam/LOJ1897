@@ -302,7 +302,7 @@
                 
                 <!-- Case Card: CAUSE OF DEATH -->
                 <Image x:Name="CaseCard_CauseOfDeath"
-                       Source="GUI/Cards/MRD_CARD_CAUSE OF DEATH.png"
+                       Source="GUI/Cards/MRD_CARD_CAUSE_OF_DEATH.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>
@@ -312,7 +312,7 @@
                 
                 <!-- Case Card: TIME AND PLACE -->
                 <Image x:Name="CaseCard_TimePlace"
-                       Source="GUI/Cards/MRD_CARD_TIME AND PLACE.png"
+                       Source="GUI/Cards/MRD_CARD_TIME_AND_PLACE.png"
                        Width="180"
                        Margin="15">
                     <Image.Effect>

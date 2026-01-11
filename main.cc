@@ -219,12 +219,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             if (application.is_window_active)
                 application.SetWindow(hWnd);
             break;
+        case WM_KEYDOWN:
+            // Forward KeyDown to Noesis so it can handle backspace, arrows, etc.
+            g_noesisRenderPath->GetNoesisView()->KeyDown(ConvertWin32KeyToNoesis((int)wParam));
+            break;
         case WM_KEYUP:
             g_noesisRenderPath->GetNoesisView()->KeyUp(ConvertWin32KeyToNoesis((int)wParam));
             break;
         case WM_CHAR:
-            //  Filter out control characters except tab, newline, and carriage return
-            if (wParam >= 32 || wParam == 9 || wParam == 10 || wParam == 13) {
+            //  Filter out control characters except tab, newline, carriage return, and backspace
+            if (wParam >= 32 || wParam == 8 || wParam == 9 || wParam == 10 || wParam == 13) {
                 g_noesisRenderPath->GetNoesisView()->Char(wParam);
             }
             break;

@@ -3,11 +3,13 @@
 #include "WickedEngine.h"
 
 #include <NsGui/BitmapImage.h>
+#include <NsGui/Border.h>
 #include <NsGui/Canvas.h>
 #include <NsGui/Grid.h>
 #include <NsGui/Image.h>
 #include <NsGui/Panel.h>
 #include <NsGui/ScaleTransform.h>
+#include <NsGui/StackPanel.h>
 #include <NsGui/TextBlock.h>
 #include <NsGui/TextBox.h>
 #include <NsGui/TranslateTransform.h>
@@ -46,12 +48,29 @@ class CaseboardMode {
         float height = 320.0f;
     };
 
+    // Field in a case-file page (label-value pair)
+    struct CaseFileField {
+        std::string label;
+        std::string value;
+    };
+
+    // Page in a case-file (contains multiple fields)
+    struct CaseFilePage {
+        std::vector<CaseFileField> fields;
+    };
+
     // Case-file cards (NPC dossiers with multiple pages)
     struct CaseFile {
         Noesis::Ptr<Noesis::Canvas> container;
+        Noesis::Ptr<Noesis::Border> coverBackground; // Yellow background for cover
+        Noesis::Ptr<Noesis::Image> pageBackground; // Notepad background for content pages
+        Noesis::Ptr<Noesis::Grid> photoImageContainer; // Container for the cover photo
         Noesis::Ptr<Noesis::Image> coverPhoto;
         Noesis::Ptr<Noesis::TextBlock> npcNameLabel;
-        std::vector<std::string> pages; // Page content (could be text or image paths)
+        Noesis::Ptr<Noesis::StackPanel> pageContentPanel; // Panel for displaying page fields
+        Noesis::Ptr<Noesis::Border> leftTab; // Tab for going back (visible when currentPage > 0)
+        Noesis::Ptr<Noesis::TextBlock> leftTabArrow;
+        std::vector<CaseFilePage> pages; // Pages with fields
         int currentPage = 0; // 0 = cover, 1+ = inside pages
         bool isOpen = false;
         float boardX = 0.0f;
@@ -155,6 +174,9 @@ class CaseboardMode {
     // Check if currently dragging a case-file
     bool IsDraggingCaseFile() const { return draggingCaseFileIndex >= 0; }
 
+    // Check if currently editing a note card
+    bool IsEditingNoteCard() const { return editingNoteCardIndex >= 0; }
+
     // Check if caseboard mode is active
     bool IsActive() const { return inCaseboardMode; }
 
@@ -164,8 +186,17 @@ class CaseboardMode {
     // Add a case-file to the caseboard with NPC info and photo
     void AddCaseFile(const std::string &photoFilename, const std::string &npcName);
 
-    // Handle click on case-file to open/navigate pages
+    // Handle click on case-file right tab to navigate forward
     void HandleCaseFileClick(int caseFileIndex, float localX, float localY);
+
+    // Handle click on case-file left tab to navigate backward
+    void HandleCaseFileLeftTabClick(int caseFileIndex);
+
+    // Update the visual content of a case-file to show current page
+    void UpdateCaseFilePageDisplay(CaseFile &file);
+
+    // Populate case-file with default pages/fields
+    void PopulateCaseFilePages(CaseFile &file);
 
     // Check if a board position is on a case-file
     int HitTestCaseFile(float boardX, float boardY);
