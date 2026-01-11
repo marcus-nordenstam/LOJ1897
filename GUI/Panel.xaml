@@ -236,6 +236,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Main dialogue area with dark background -->
@@ -294,9 +295,26 @@
             </Grid>
         </Grid>
 
-        <!-- Hint text area (below the panel) -->
-        <TextBlock x:Name="DialogueHintText"
+        <!-- Notification message (centered below input, fades out after 3 seconds) -->
+        <TextBlock x:Name="NotificationText"
                    Grid.Row="1"
+                   Text="Testimony added to caseboard"
+                   FontSize="18"
+                   FontWeight="Normal"
+                   Foreground="#FFFFFF00"
+                   HorizontalAlignment="Center"
+                   Margin="0,10,0,0"
+                   FontFamily="Verdana"
+                   Opacity="0"
+                   Visibility="Collapsed">
+            <TextBlock.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="2" Opacity="0.8"/>
+            </TextBlock.Effect>
+        </TextBlock>
+
+        <!-- Hint text area (below notification) -->
+        <TextBlock x:Name="DialogueHintText"
+                   Grid.Row="2"
                    FontFamily="Verdana"
                    FontSize="16"
                    Foreground="#FFFFFF00"

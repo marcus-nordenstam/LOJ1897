@@ -26,6 +26,7 @@ class DialogueMode {
         std::string message;
         Noesis::Ptr<Noesis::Border> borderElement; // UI element container
         bool isPlayer = false;
+        bool isRecorded = false; // True if this testimony has been recorded
     };
 
     DialogueMode() = default;
@@ -80,8 +81,11 @@ class DialogueMode {
     // Get the hovered dialogue entry (returns nullptr if none hovered or if player message)
     const DialogueEntry* GetHoveredEntry() const;
 
-    // Check if a recordable message is hovered (non-player message)
+    // Check if a recordable message is hovered (non-player message that hasn't been recorded)
     bool IsRecordableMessageHovered() const;
+
+    // Mark the currently hovered entry as recorded
+    void MarkHoveredAsRecorded();
 
     // Callback setter for mode change notifications
     using ModeChangeCallback = std::function<void(bool entering)>;

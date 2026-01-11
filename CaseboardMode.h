@@ -44,8 +44,8 @@ class CaseboardMode {
         float boardX = 0.0f;
         float boardY = 0.0f;
         std::string labelText;
-        float width = 256.0f;
-        float height = 320.0f;
+        float width = 180.0f;  // Same as black cards
+        float height = 225.0f; // Maintains 4:5 aspect ratio
     };
 
     // Testimony cards (recorded NPC dialogue)
@@ -57,8 +57,8 @@ class CaseboardMode {
         float boardY = 0.0f;
         std::string speaker;
         std::string message;
-        float width = 320.0f;
-        float height = 256.0f;
+        float width = 180.0f;  // Same as black cards
+        float height = 232.0f; // Same as black cards
     };
 
     // Field in a case-file page (label-value pair)

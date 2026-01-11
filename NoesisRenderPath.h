@@ -105,6 +105,11 @@ class NoesisRenderPath : public wi::RenderPath3D {
     bool mouseInitialized = false;
     float mouseSensitivity = 0.002f; // Mouse sensitivity for looking around
 
+    // Notification system
+    Noesis::Ptr<Noesis::TextBlock> notificationText;
+    float notificationTimer = 0.0f;
+    const float notificationDuration = 3.0f; // 3 seconds
+
   public:
     // Set window handle for fullscreen management
     void SetWindowHandle(HWND hwnd) { windowHandle = hwnd; }
@@ -193,4 +198,5 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     void InitializeNoesis();
     void ShutdownNoesis();
+    void ShowNotification(const char* message);
 };

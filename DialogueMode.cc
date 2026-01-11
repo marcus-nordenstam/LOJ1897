@@ -223,6 +223,14 @@ void DialogueMode::SetTalkIndicatorVisible(bool visible) {
 }
 
 void DialogueMode::UpdateDialogueHover(int mouseX, int mouseY) {
+    // Clear previous hover highlight
+    if (hoveredEntryIndex >= 0 && hoveredEntryIndex < (int)dialogueEntries.size()) {
+        DialogueEntry& prevEntry = dialogueEntries[hoveredEntryIndex];
+        if (prevEntry.borderElement) {
+            prevEntry.borderElement->SetBackground(nullptr);
+        }
+    }
+    
     hoveredEntryIndex = -1;
 
     if (!inDialogueMode || !dialogueList) {
@@ -234,7 +242,7 @@ void DialogueMode::UpdateDialogueHover(int mouseX, int mouseY) {
 
     // Check each dialogue entry to see if mouse is over it
     for (size_t i = 0; i < dialogueEntries.size(); ++i) {
-        const DialogueEntry& entry = dialogueEntries[i];
+        DialogueEntry& entry = dialogueEntries[i];
         if (!entry.borderElement || entry.isPlayer) {
             continue; // Skip player messages
         }
@@ -249,15 +257,28 @@ void DialogueMode::UpdateDialogueHover(int mouseX, int mouseY) {
             mouseY >= screenPos.y && mouseY <= screenPos.y + height) {
             hoveredEntryIndex = (int)i;
             
-            // Position and show record indicator
-            if (recordIndicator) {
-                // Position to the left of the dialogue panel using margin
-                // This positions it in screen space relative to the dialogue entry
-                float indicatorX = screenPos.x - 200.0f;
-                float indicatorY = screenPos.y + (height / 2.0f) - 15.0f;
+            // Only show indicator and highlight for unrecorded messages
+            if (!entry.isRecorded) {
+                // Add yellow transparent background highlight
+                Noesis::Ptr<Noesis::SolidColorBrush> highlightBrush =
+                    Noesis::MakePtr<Noesis::SolidColorBrush>(Noesis::Color(255, 255, 0, 60)); // Yellow with alpha
+                entry.borderElement->SetBackground(highlightBrush);
                 
-                recordIndicator->SetMargin(Noesis::Thickness(indicatorX, indicatorY, 0, 0));
-                recordIndicator->SetVisibility(Noesis::Visibility_Visible);
+                // Position and show record indicator
+                if (recordIndicator) {
+                    // Position to the left of the dialogue panel using margin
+                    // This positions it in screen space relative to the dialogue entry
+                    float indicatorX = screenPos.x - 200.0f;
+                    float indicatorY = screenPos.y + (height / 2.0f) - 15.0f;
+                    
+                    recordIndicator->SetMargin(Noesis::Thickness(indicatorX, indicatorY, 0, 0));
+                    recordIndicator->SetVisibility(Noesis::Visibility_Visible);
+                }
+            } else {
+                // Already recorded - hide indicator
+                if (recordIndicator) {
+                    recordIndicator->SetVisibility(Noesis::Visibility_Collapsed);
+                }
             }
             return;
         }
@@ -272,7 +293,7 @@ void DialogueMode::UpdateDialogueHover(int mouseX, int mouseY) {
 const DialogueMode::DialogueEntry* DialogueMode::GetHoveredEntry() const {
     if (hoveredEntryIndex >= 0 && hoveredEntryIndex < (int)dialogueEntries.size()) {
         const DialogueEntry& entry = dialogueEntries[hoveredEntryIndex];
-        if (!entry.isPlayer) {
+        if (!entry.isPlayer && !entry.isRecorded) {
             return &entry;
         }
     }
@@ -281,6 +302,23 @@ const DialogueMode::DialogueEntry* DialogueMode::GetHoveredEntry() const {
 
 bool DialogueMode::IsRecordableMessageHovered() const {
     return GetHoveredEntry() != nullptr;
+}
+
+void DialogueMode::MarkHoveredAsRecorded() {
+    if (hoveredEntryIndex >= 0 && hoveredEntryIndex < (int)dialogueEntries.size()) {
+        DialogueEntry& entry = dialogueEntries[hoveredEntryIndex];
+        entry.isRecorded = true;
+        
+        // Remove highlight
+        if (entry.borderElement) {
+            entry.borderElement->SetBackground(nullptr);
+        }
+        
+        // Hide indicator
+        if (recordIndicator) {
+            recordIndicator->SetVisibility(Noesis::Visibility_Collapsed);
+        }
+    }
 }
 
 void DialogueMode::RequestExit() {

@@ -205,9 +205,9 @@ void CaseboardMode::CaseboardPanStart(int x, int y) {
         NoteCard &card = noteCards[editingNoteCardIndex];
 
         float cardLeft = card.boardX - 90.0f;
-        float cardTop = card.boardY - 110.0f;
+        float cardTop = card.boardY - 116.0f;
         float cardRight = cardLeft + 180.0f;
-        float cardBottom = cardTop + 220.0f;
+        float cardBottom = cardTop + 232.0f;
 
         bool clickedOutside = (boardClickX < cardLeft || boardClickX > cardRight ||
                                boardClickY < cardTop || boardClickY > cardBottom);
@@ -225,9 +225,9 @@ void CaseboardMode::CaseboardPanStart(int x, int y) {
                 continue;
 
             float cardLeft = card.boardX - 90.0f + 15.0f;
-            float cardTop = card.boardY - 110.0f + 40.0f;
+            float cardTop = card.boardY - 116.0f + 40.0f;
             float cardRight = card.boardX - 90.0f + 180.0f - 15.0f;
-            float cardBottom = card.boardY - 110.0f + 220.0f - 20.0f;
+            float cardBottom = card.boardY - 116.0f + 232.0f - 20.0f;
 
             if (boardClickX >= cardLeft && boardClickX <= cardRight && boardClickY >= cardTop &&
                 boardClickY <= cardBottom) {
@@ -404,10 +404,10 @@ void CaseboardMode::AddNoteCard() {
     float boardX = (viewCenterX - caseboardPanX) / caseboardZoom;
     float boardY = (viewCenterY - caseboardPanY) / caseboardZoom;
 
-    // Create the note card container
+    // Create the note card container (same dimensions as black cards)
     Noesis::Ptr<Noesis::Grid> noteContainer = *new Noesis::Grid();
     noteContainer->SetWidth(180.0f);
-    noteContainer->SetHeight(220.0f);
+    noteContainer->SetHeight(232.0f);
 
     // Create background image
     Noesis::Ptr<Noesis::Image> bgImage = *new Noesis::Image();
@@ -425,7 +425,7 @@ void CaseboardMode::AddNoteCard() {
     textBox->SetVerticalAlignment(Noesis::VerticalAlignment_Stretch);
     textBox->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
     textBox->SetMargin(Noesis::Thickness(15.0f, 20.0f, 15.0f, 20.0f));
-    textBox->SetFontSize(16.0f);
+    textBox->SetFontSize(14.0f);
     textBox->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Old Man Eloquent"));
 
     Noesis::Ptr<Noesis::SolidColorBrush> inkBrush =
@@ -436,9 +436,9 @@ void CaseboardMode::AddNoteCard() {
     textBox->SetCaretBrush(inkBrush);
     noteContainer->GetChildren()->Add(textBox);
 
-    // Position on canvas
+    // Position on canvas (centered)
     Noesis::Canvas::SetLeft(noteContainer, boardX - 90.0f);
-    Noesis::Canvas::SetTop(noteContainer, boardY - 110.0f);
+    Noesis::Canvas::SetTop(noteContainer, boardY - 116.0f);
 
     // Add to caseboard
     Noesis::UIElementCollection *children = caseboardContent->GetChildren();
@@ -488,7 +488,7 @@ void CaseboardMode::FinalizeNoteCardEdit() {
     textLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
     textLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Left);
     textLabel->SetMargin(Noesis::Thickness(27.0f, 28.0f, 15.0f, 20.0f));
-    textLabel->SetFontSize(16.0f);
+    textLabel->SetFontSize(14.0f);
     textLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Old Man Eloquent"));
     textLabel->SetFontWeight(Noesis::FontWeight_Normal);
 
@@ -565,9 +565,9 @@ int CaseboardMode::HitTestNoteCardDragArea(float boardX, float boardY) {
         NoteCard &card = noteCards[i];
 
         float cardLeft = card.boardX - 90.0f;
-        float cardTop = card.boardY - 110.0f;
+        float cardTop = card.boardY - 116.0f;
         float cardRight = cardLeft + 180.0f;
-        float cardBottom = cardTop + 220.0f;
+        float cardBottom = cardTop + 232.0f;
 
         float textLeft = cardLeft + 15.0f;
         float textTop = cardTop + 20.0f;
@@ -687,7 +687,7 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     wi::backlog::post("AddTestimonyCard: Creating testimony card...\n");
 
     // Calculate position in board space (offset below existing cards)
-    float boardX = 400.0f + testimonyCards.size() * 350.0f;
+    float boardX = 400.0f + testimonyCards.size() * 210.0f;
     float boardY = 400.0f;
 
     // Create testimony card
@@ -697,14 +697,14 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     testimony.boardX = boardX;
     testimony.boardY = boardY;
 
-    // Create container Grid
+    // Create container Grid (same dimensions as black cards)
     Noesis::Ptr<Noesis::Grid> cardContainer = Noesis::MakePtr<Noesis::Grid>();
-    cardContainer->SetWidth(320.0f);
-    cardContainer->SetHeight(256.0f);
+    cardContainer->SetWidth(180.0f);
+    cardContainer->SetHeight(232.0f);
 
     // Add rows for speaker and message
     Noesis::Ptr<Noesis::RowDefinition> row0 = Noesis::MakePtr<Noesis::RowDefinition>();
-    row0->SetHeight(Noesis::GridLength(60.0f, Noesis::GridUnitType_Pixel));
+    row0->SetHeight(Noesis::GridLength(50.0f, Noesis::GridUnitType_Pixel));
     cardContainer->GetRowDefinitions()->Add(row0);
     
     Noesis::Ptr<Noesis::RowDefinition> row1 = Noesis::MakePtr<Noesis::RowDefinition>();
@@ -720,16 +720,16 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     Noesis::Grid::SetRowSpan(backgroundImage, 2);
     cardContainer->GetChildren()->Add(backgroundImage);
 
-    // Speaker label (top, centered, larger font)
+    // Speaker label (top, centered, smaller font for smaller card)
     Noesis::Ptr<Noesis::TextBlock> speakerLabel = Noesis::MakePtr<Noesis::TextBlock>();
     speakerLabel->SetText(speaker.c_str());
-    speakerLabel->SetFontSize(24.0f);
+    speakerLabel->SetFontSize(14.0f);
     speakerLabel->SetFontWeight(Noesis::FontWeight_Bold);
     speakerLabel->SetTextWrapping(Noesis::TextWrapping_Wrap);
     speakerLabel->SetTextAlignment(Noesis::TextAlignment_Center);
     speakerLabel->SetVerticalAlignment(Noesis::VerticalAlignment_Center);
     speakerLabel->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
-    speakerLabel->SetMargin(Noesis::Thickness(20, 10, 20, 5));
+    speakerLabel->SetMargin(Noesis::Thickness(10, 8, 10, 4));
     speakerLabel->SetEffect(nullptr); // No shadow
     
     // Use Opera Lyrics font
@@ -745,15 +745,16 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     Noesis::Grid::SetRow(speakerLabel, 0);
     cardContainer->GetChildren()->Add(speakerLabel);
 
-    // Message text (bottom area, wrapped)
+    // Message text (bottom area, wrapped, smaller font for smaller card)
     Noesis::Ptr<Noesis::TextBlock> messageText = Noesis::MakePtr<Noesis::TextBlock>();
-    messageText->SetText(message.c_str());
-    messageText->SetFontSize(16.0f);
+    std::string quotedMessage = "\"" + message + "\"";
+    messageText->SetText(quotedMessage.c_str());
+    messageText->SetFontSize(10.0f);
     messageText->SetTextWrapping(Noesis::TextWrapping_Wrap);
     messageText->SetTextAlignment(Noesis::TextAlignment_Left);
     messageText->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
     messageText->SetHorizontalAlignment(Noesis::HorizontalAlignment_Stretch);
-    messageText->SetMargin(Noesis::Thickness(25, 10, 25, 20));
+    messageText->SetMargin(Noesis::Thickness(12, 6, 12, 12));
     messageText->SetEffect(nullptr); // No shadow
     messageText->SetFontFamily(fontFamily);
     messageText->SetForeground(textBrush);
@@ -769,9 +770,9 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     shadow->SetOpacity(0.5f);
     cardContainer->SetEffect(shadow);
 
-    // Position card in board space
-    Noesis::Canvas::SetLeft(cardContainer, boardX - 160.0f);
-    Noesis::Canvas::SetTop(cardContainer, boardY - 128.0f);
+    // Position card in board space (centered)
+    Noesis::Canvas::SetLeft(cardContainer, boardX - 90.0f);
+    Noesis::Canvas::SetTop(cardContainer, boardY - 116.0f);
 
     // Add to caseboard content
     caseboardContent->GetChildren()->Add(cardContainer);
@@ -1267,17 +1268,17 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     float boardX = 500.0f + (photoCards.size() % 5) * 250.0f;
     float boardY = -400.0f + (photoCards.size() / 5) * 350.0f;
 
-    // Physical evidence card dimensions from original Unreal (Card.h), scaled up 2x:
-    // Original: 128x160 -> Scaled: 256x320
-    const float cardWidth = 256.0f;
-    const float cardHeight = 320.0f;
+    // Physical evidence card dimensions - match black cards width (180px)
+    // Maintain original aspect ratio: 256x320 (4:5 ratio)
+    // New: 180x225
+    const float cardWidth = 180.0f;
+    const float cardHeight = 225.0f;
 
-    // Layout constants from Card.h (scaled 2x):
-    // - Label height: 16px -> 32px
-    // - Image margin: 8px -> 16px (on left, right, and bottom)
-    // - Image area: 112x136px -> 224x272px
-    const float imageMargin = 16.0f;
-    const float labelHeight = 32.0f;
+    // Layout constants (scaled proportionally to new card size):
+    // - Label height: 28px (reduced from 32px)
+    // - Image margin: 12px (reduced from 16px)
+    const float imageMargin = 12.0f;
+    const float labelHeight = 28.0f;
     const float imageAreaTop = labelHeight + imageMargin;
     const float imageAreaBottom = imageMargin;
 
@@ -1320,7 +1321,7 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     Noesis::Ptr<Noesis::TextBlock> photoLabel = *new Noesis::TextBlock();
     std::string labelText = "Photo";
     photoLabel->SetText(labelText.c_str());
-    photoLabel->SetFontSize(20.0f);
+    photoLabel->SetFontSize(16.0f);
     photoLabel->SetFontFamily(Noesis::MakePtr<Noesis::FontFamily>("Fonts/#Opera-Lyrics-Smooth"));
     photoLabel->SetForeground(Noesis::MakePtr<Noesis::SolidColorBrush>(
         Noesis::Color(0x2B, 0x3D, 0x5C))); // Dark ink color

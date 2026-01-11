@@ -208,6 +208,8 @@ bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
             const DialogueMode::DialogueEntry* entry = dialogueSystem.GetHoveredEntry();
             if (entry) {
                 caseboardSystem.AddTestimonyCard(entry->speaker, entry->message);
+                dialogueSystem.MarkHoveredAsRecorded(); // Mark as recorded so it won't show indicator again
+                ShowNotification("Testimony added to caseboard");
                 wi::backlog::post("Recorded testimony from ");
                 wi::backlog::post(entry->speaker.c_str());
                 wi::backlog::post("\n");
@@ -329,6 +331,23 @@ void NoesisRenderPath::Stop() {
 
 void NoesisRenderPath::Update(float dt) {
     RenderPath3D::Update(dt);
+
+    // Update notification fade-out
+    if (notificationTimer > 0.0f) {
+        notificationTimer -= dt;
+        if (notificationTimer <= 0.0f) {
+            // Hide notification
+            if (notificationText) {
+                notificationText->SetVisibility(Noesis::Visibility_Collapsed);
+                notificationText->SetOpacity(0.0f);
+            }
+        } else {
+            // Fade out in the last second
+            if (notificationText && notificationTimer < 1.0f) {
+                notificationText->SetOpacity(notificationTimer);
+            }
+        }
+    }
 
     // Run shutter animation if active
     if (cameraSystem.IsShutterActive()) {
@@ -846,6 +865,7 @@ void NoesisRenderPath::InitializeNoesis() {
     auto cameraPhotoCount = FindElementByName<Noesis::TextBlock>(rootGrid, "CameraPhotoCount");
     auto recordIndicator = FindElementByName<Noesis::StackPanel>(rootGrid, "RecordIndicator");
     auto dialogueByeButton = FindElementByName<Noesis::Button>(rootGrid, "DialogueByeButton");
+    notificationText = FindElementByName<Noesis::TextBlock>(rootGrid, "NotificationText");
 
     // Initialize subsystems
     dialogueSystem.Initialize(dialoguePanelRoot.GetPtr(), dialogueScrollViewer.GetPtr(),
@@ -958,6 +978,7 @@ void NoesisRenderPath::ShutdownNoesis() {
     uiView.Reset();
     noesisDevice.Reset();
     rootElement.Reset();
+    notificationText.Reset();
 
     if (frameFence) {
         frameFence->Release();
@@ -965,4 +986,14 @@ void NoesisRenderPath::ShutdownNoesis() {
     }
 
     Noesis::GUI::Shutdown();
+}
+
+void NoesisRenderPath::ShowNotification(const char* message) {
+    if (!notificationText)
+        return;
+
+    notificationText->SetText(message);
+    notificationText->SetVisibility(Noesis::Visibility_Visible);
+    notificationText->SetOpacity(1.0f);
+    notificationTimer = notificationDuration;
 }
