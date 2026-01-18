@@ -425,6 +425,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
         SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSm);
     }
 
+    // Initialize WickedLOJ Project before any Wicked Engine initialization
+    wi::Project::create();
+
     // set Win32 window to engine:
     application.SetWindow(hWnd);
 
@@ -453,7 +456,27 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     noesisRenderPath.setFXAAEnabled(true);
     noesisRenderPath.SetWindowHandle(hWnd);
 
+    // Load config FIRST to set project paths (like Editor does with InitializeFromConfig)
+    noesisRenderPath.gameStartup.LoadConfig();
+
+    // Initialize application (starts async shader compilation, sets up systems)
+    // This must be called before refresh_material_library, same as Editor
+    application.Initialize();
+
+    // Skip material library loading - .grm files appear to be corrupted/incompatible
+    // Materials embedded in scene files will still work
+    wi::Project::ptr()->LoadMaterialLibrary();
+
     application.ActivatePath(&noesisRenderPath);
+
+    // Set master scene and load game scene
+    noesisRenderPath.gameStartup.LoadGameScene(scene);
+    wi::Project::ptr()->master_scene = &scene;
+
+    // IMPORTANT: Sync the global camera with scene camera to prevent terrain reset
+    // RenderPath3D copies its camera to scene.camera on every frame, so we need
+    // the global camera to match the spawn position set in LoadGameScene
+    wi::scene::GetCamera() = scene.camera;
 
     // Close splash screen after initialization
     if (hSplash) {
@@ -483,6 +506,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     }
 
     wi::jobsystem::ShutDown(); // waits for jobs to finish before shutdown
+
+    // Destroy WickedLOJ Project at the end
+    wi::Project::destroy();
 
     g_noesisRenderPath = nullptr; // Clear reference
 

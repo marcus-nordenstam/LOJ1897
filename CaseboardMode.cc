@@ -595,6 +595,7 @@ void CaseboardMode::AddNoteCard() {
     Noesis::Ptr<Noesis::Grid> noteContainer = *new Noesis::Grid();
     noteContainer->SetWidth(180.0f);
     noteContainer->SetHeight(232.0f);
+    noteContainer->SetClipToBounds(false); // Allow pin to extend beyond bounds
 
     // Create background image
     Noesis::Ptr<Noesis::Image> bgImage = *new Noesis::Image();
@@ -604,20 +605,8 @@ void CaseboardMode::AddNoteCard() {
     bgImage->SetStretch(Noesis::Stretch_Fill);
     noteContainer->GetChildren()->Add(bgImage);
 
-    // Add pin image at top center
-    Noesis::Ptr<Noesis::Image> pinImage = *new Noesis::Image();
-    pinImage->SetSource(pinBitmapImage);
-    pinImage->SetWidth(24.0f);
-    pinImage->SetHeight(24.0f);
-    pinImage->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
-    pinImage->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
-    pinImage->SetMargin(Noesis::Thickness(0, -12.0f, 0, 0)); // Position at top edge
-    // No Z-index needed - pins render on top by being added last to card container
-    noteContainer->GetChildren()->Add(pinImage);
-
     // Store pin image reference for later color updates
     NoteCard tempCard;
-    tempCard.pin.pinImage = pinImage;
 
     // Create text box for note input
     Noesis::Ptr<Noesis::TextBox> textBox = *new Noesis::TextBox();
@@ -637,6 +626,17 @@ void CaseboardMode::AddNoteCard() {
     textBox->SetBorderThickness(Noesis::Thickness(0.0f));
     textBox->SetCaretBrush(inkBrush);
     noteContainer->GetChildren()->Add(textBox);
+
+    // Add pin image at bottom center (added last to ensure it renders on top)
+    Noesis::Ptr<Noesis::Image> pinImage = *new Noesis::Image();
+    pinImage->SetSource(pinBitmapImage);
+    pinImage->SetWidth(24.0f);
+    pinImage->SetHeight(24.0f);
+    pinImage->SetVerticalAlignment(Noesis::VerticalAlignment_Bottom);
+    pinImage->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
+    pinImage->SetMargin(Noesis::Thickness(0, 0, 0, -12.0f)); // Position at bottom edge
+    noteContainer->GetChildren()->Add(pinImage);
+    tempCard.pin.pinImage = pinImage;
 
     // Position on canvas (centered)
     Noesis::Canvas::SetLeft(noteContainer, boardX - 90.0f);
@@ -658,7 +658,7 @@ void CaseboardMode::AddNoteCard() {
     card.isEditing = true;
     card.savedText = "";
     card.pin = tempCard.pin;
-    card.pin.pinOffsetY = -116.0f; // Pin at top of card
+    card.pin.pinOffsetY = 116.0f; // Pin at bottom of card
     noteCards.push_back(card);
 
     editingNoteCardIndex = (int)noteCards.size() - 1;
@@ -703,6 +703,12 @@ void CaseboardMode::FinalizeNoteCardEdit() {
 
     if (children) {
         children->Add(textLabel);
+        
+        // Ensure pin is added last (on top) - remove and re-add if it exists
+        if (card.pin.pinImage) {
+            children->Remove(card.pin.pinImage.GetPtr());
+            children->Add(card.pin.pinImage);
+        }
     }
 
     card.textLabel = textLabel;
@@ -911,6 +917,7 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     Noesis::Ptr<Noesis::Grid> cardContainer = Noesis::MakePtr<Noesis::Grid>();
     cardContainer->SetWidth(180.0f);
     cardContainer->SetHeight(232.0f);
+    cardContainer->SetClipToBounds(false); // Allow pin to extend beyond bounds
 
     // Add rows for speaker and message
     Noesis::Ptr<Noesis::RowDefinition> row0 = Noesis::MakePtr<Noesis::RowDefinition>();
@@ -929,17 +936,6 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     backgroundImage->SetStretch(Noesis::Stretch_Fill);
     Noesis::Grid::SetRowSpan(backgroundImage, 2);
     cardContainer->GetChildren()->Add(backgroundImage);
-
-    // Add pin image at top center
-    Noesis::Ptr<Noesis::Image> testimonyPinImage = Noesis::MakePtr<Noesis::Image>();
-    testimonyPinImage->SetSource(pinBitmapImage);
-    testimonyPinImage->SetWidth(24.0f);
-    testimonyPinImage->SetHeight(24.0f);
-    testimonyPinImage->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
-    testimonyPinImage->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
-    testimonyPinImage->SetMargin(Noesis::Thickness(0, -12.0f, 0, 0));
-    Noesis::Grid::SetRowSpan(testimonyPinImage, 2);
-    cardContainer->GetChildren()->Add(testimonyPinImage);
 
     // Speaker label (top, centered, smaller font for smaller card)
     Noesis::Ptr<Noesis::TextBlock> speakerLabel = Noesis::MakePtr<Noesis::TextBlock>();
@@ -991,6 +987,17 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     shadow->SetOpacity(0.5f);
     cardContainer->SetEffect(shadow);
 
+    // Add pin image at bottom center (added last to ensure it renders on top)
+    Noesis::Ptr<Noesis::Image> testimonyPinImage = Noesis::MakePtr<Noesis::Image>();
+    testimonyPinImage->SetSource(pinBitmapImage);
+    testimonyPinImage->SetWidth(24.0f);
+    testimonyPinImage->SetHeight(24.0f);
+    testimonyPinImage->SetVerticalAlignment(Noesis::VerticalAlignment_Bottom);
+    testimonyPinImage->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
+    testimonyPinImage->SetMargin(Noesis::Thickness(0, 0, 0, -12.0f));
+    Noesis::Grid::SetRowSpan(testimonyPinImage, 2);
+    cardContainer->GetChildren()->Add(testimonyPinImage);
+
     // Position card in board space (centered)
     Noesis::Canvas::SetLeft(cardContainer, boardX - 90.0f);
     Noesis::Canvas::SetTop(cardContainer, boardY - 116.0f);
@@ -1003,7 +1010,7 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     testimony.speakerLabel = speakerLabel;
     testimony.messageText = messageText;
     testimony.pin.pinImage = testimonyPinImage;
-    testimony.pin.pinOffsetY = -testimony.height / 2.0f; // Pin at top
+    testimony.pin.pinOffsetY = testimony.height / 2.0f; // Pin at bottom
     testimonyCards.push_back(testimony);
 
     wi::backlog::post("AddTestimonyCard: Testimony card created successfully!\n");
@@ -1212,13 +1219,13 @@ void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::str
     Noesis::Canvas::SetRight(npcLabel, photoMarginH + tabWidth);
     fileContainer->GetChildren()->Add(npcLabel);
 
-    // Add pin image at bottom center (for case files, pins are at bottom)
+    // Add pin image at top center (for case files, pins are at top)
     Noesis::Ptr<Noesis::Image> caseFilePinImage = *new Noesis::Image();
     caseFilePinImage->SetSource(pinBitmapImage);
     caseFilePinImage->SetWidth(24.0f);
     caseFilePinImage->SetHeight(24.0f);
     Noesis::Canvas::SetLeft(caseFilePinImage, (fileWidth - 24.0f) / 2.0f);
-    Noesis::Canvas::SetTop(caseFilePinImage, fileHeight - 12.0f);
+    Noesis::Canvas::SetTop(caseFilePinImage, -12.0f);
     fileContainer->GetChildren()->Add(caseFilePinImage);
 
     // Layer 5: Page content panel (for displaying fields on pages 1+)
@@ -1273,7 +1280,7 @@ void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::str
     caseFile.currentPage = 0;
     caseFile.isOpen = false;
     caseFile.pin.pinImage = caseFilePinImage;
-    caseFile.pin.pinOffsetY = fileHeight / 2.0f; // Pin at bottom for case files
+    caseFile.pin.pinOffsetY = -fileHeight / 2.0f; // Pin at top for case files
 
     // Populate with dynamic pages
     PopulateCaseFilePages(caseFile);
@@ -1573,6 +1580,7 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     Noesis::Ptr<Noesis::Grid> photoContainer = *new Noesis::Grid();
     photoContainer->SetWidth(cardWidth);
     photoContainer->SetHeight(cardHeight);
+    photoContainer->SetClipToBounds(false); // Allow pin to extend beyond bounds
 
     // Layer 1: Background - Physical evidence card bitmap
     Noesis::Ptr<Noesis::Image> cardBackground = *new Noesis::Image();
@@ -1604,16 +1612,6 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     photoImageContainer->GetChildren()->Add(photoImage);
     photoContainer->GetChildren()->Add(photoImageContainer);
 
-    // Add pin image at top center
-    Noesis::Ptr<Noesis::Image> photoPinImage = *new Noesis::Image();
-    photoPinImage->SetSource(pinBitmapImage);
-    photoPinImage->SetWidth(24.0f);
-    photoPinImage->SetHeight(24.0f);
-    photoPinImage->SetVerticalAlignment(Noesis::VerticalAlignment_Top);
-    photoPinImage->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
-    photoPinImage->SetMargin(Noesis::Thickness(0, -12.0f, 0, 0));
-    photoContainer->GetChildren()->Add(photoPinImage);
-
     // Layer 3: Label (centered at the top, within labelHeight area)
     Noesis::Ptr<Noesis::TextBlock> photoLabel = *new Noesis::TextBlock();
     std::string labelText = "Photo";
@@ -1629,6 +1627,16 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     photoLabel->SetFontWeight(Noesis::FontWeight_Normal);
     photoLabel->SetTextAlignment(Noesis::TextAlignment_Center);
     photoContainer->GetChildren()->Add(photoLabel);
+
+    // Add pin image at bottom center (added last to ensure it renders on top)
+    Noesis::Ptr<Noesis::Image> photoPinImage = *new Noesis::Image();
+    photoPinImage->SetSource(pinBitmapImage);
+    photoPinImage->SetWidth(24.0f);
+    photoPinImage->SetHeight(24.0f);
+    photoPinImage->SetVerticalAlignment(Noesis::VerticalAlignment_Bottom);
+    photoPinImage->SetHorizontalAlignment(Noesis::HorizontalAlignment_Center);
+    photoPinImage->SetMargin(Noesis::Thickness(0, 0, 0, -12.0f));
+    photoContainer->GetChildren()->Add(photoPinImage);
 
     // Add drop shadow effect to entire card (matching Unreal shadow rendering)
     Noesis::Ptr<Noesis::DropShadowEffect> shadowEffect = *new Noesis::DropShadowEffect();
@@ -1665,7 +1673,7 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     card.width = cardWidth;
     card.height = cardHeight;
     card.pin.pinImage = photoPinImage;
-    card.pin.pinOffsetY = -cardHeight / 2.0f; // Pin at top of card
+    card.pin.pinOffsetY = cardHeight / 2.0f; // Pin at bottom of card
     photoCards.push_back(card);
 }
 
@@ -1682,10 +1690,10 @@ bool CaseboardMode::HitTestPin(int cardType, int cardIndex, float boardX, float 
     // Pins are 24x24 images with margin -12, so they extend 12px beyond the card edge
     // The pin CENTER is at the card edge (top or bottom)
     float pinOffsetY;
-    if (cardType == 3) { // CaseFile - pin at bottom edge
-        pinOffsetY = cardHeight / 2.0f;
-    } else { // Other cards - pin at top edge
+    if (cardType == 3) { // CaseFile - pin at top edge
         pinOffsetY = -cardHeight / 2.0f;
+    } else { // Other cards (Note, Photo, Testimony) - pin at bottom edge
+        pinOffsetY = cardHeight / 2.0f;
     }
 
     float pinCenterX = cardX;
@@ -1717,7 +1725,7 @@ void CaseboardMode::StartConnection(int cardType, int cardIndex) {
 
     float cardX, cardY, cardWidth, cardHeight;
     if (GetCardGeometry(this, cardType, cardIndex, cardX, cardY, cardWidth, cardHeight)) {
-        float pinOffsetY = (cardType == 3) ? cardHeight / 2.0f : -cardHeight / 2.0f;
+        float pinOffsetY = (cardType == 3) ? -cardHeight / 2.0f : cardHeight / 2.0f;
         dragConnectionX = cardX;
         dragConnectionY = cardY + pinOffsetY;
     }
@@ -1747,7 +1755,7 @@ void CaseboardMode::UpdateConnectionDrag(float boardX, float boardY) {
         float x1, y1, w1, h1;
         if (GetCardGeometry(this, dragStartCardType, dragStartCardIndex, x1, y1, w1, h1)) {
             // Pin center is at the card edge (top or bottom)
-            float pinOffset = (dragStartCardType == 3) ? h1 / 2.0f : -h1 / 2.0f;
+            float pinOffset = (dragStartCardType == 3) ? -h1 / 2.0f : h1 / 2.0f;
             float pinY1 = y1 + pinOffset;
             float x2 = boardX;
             float y2 = boardY;
@@ -1977,8 +1985,8 @@ void CaseboardMode::RenderConnections(Noesis::Canvas *canvas) {
         }
 
         // Calculate pin positions - pin center is at card edge (top or bottom)
-        float pinOffsetA = (conn.cardAType == 3) ? h1 / 2.0f : -h1 / 2.0f;
-        float pinOffsetB = (conn.cardBType == 3) ? h2 / 2.0f : -h2 / 2.0f;
+        float pinOffsetA = (conn.cardAType == 3) ? -h1 / 2.0f : h1 / 2.0f;
+        float pinOffsetB = (conn.cardBType == 3) ? -h2 / 2.0f : h2 / 2.0f;
         float pinY1 = y1 + pinOffsetA;
         float pinY2 = y2 + pinOffsetB;
 

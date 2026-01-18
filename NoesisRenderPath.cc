@@ -58,21 +58,13 @@ void NoesisRenderPath::CaseboardZoom(int x, int y, float delta) {
     caseboardSystem.CaseboardZoom(x, y, delta);
 }
 
-void NoesisRenderPath::CaseboardPanStart(int x, int y) {
-    caseboardSystem.CaseboardPanStart(x, y);
-}
+void NoesisRenderPath::CaseboardPanStart(int x, int y) { caseboardSystem.CaseboardPanStart(x, y); }
 
-void NoesisRenderPath::CaseboardPanEnd() {
-    caseboardSystem.CaseboardPanEnd();
-}
+void NoesisRenderPath::CaseboardPanEnd() { caseboardSystem.CaseboardPanEnd(); }
 
-void NoesisRenderPath::CaseboardPanMove(int x, int y) {
-    caseboardSystem.CaseboardPanMove(x, y);
-}
+void NoesisRenderPath::CaseboardPanMove(int x, int y) { caseboardSystem.CaseboardPanMove(x, y); }
 
-void NoesisRenderPath::AddNoteCard() {
-    caseboardSystem.AddNoteCard();
-}
+void NoesisRenderPath::AddNoteCard() { caseboardSystem.AddNoteCard(); }
 
 // ========== CAMERA SYSTEM FORWARDING ==========
 
@@ -137,13 +129,9 @@ void NoesisRenderPath::EnterCameraModeForCaseFile(wi::ecs::Entity npcEntity) {
     SetFirstPersonMode(true);
 }
 
-void NoesisRenderPath::TakePhoto() {
-    cameraSystem.TakePhoto();
-}
+void NoesisRenderPath::TakePhoto() { cameraSystem.TakePhoto(); }
 
-void NoesisRenderPath::CameraClick(int x, int y) {
-    cameraSystem.CameraClick(x, y);
-}
+void NoesisRenderPath::CameraClick(int x, int y) { cameraSystem.CameraClick(x, y); }
 
 // ========== KEYBOARD SHORTCUT HANDLING ==========
 
@@ -156,10 +144,11 @@ bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
 
     // Additional check: see if any TextBox has keyboard focus
     if (rootElement) {
-        Noesis::UIElement* focusedElement = Noesis::FocusManager::GetFocusedElement(rootElement);
+        Noesis::UIElement *focusedElement = Noesis::FocusManager::GetFocusedElement(rootElement);
         if (focusedElement) {
             // Check if the focused element is a TextBox
-            Noesis::TextBox* focusedTextBox = Noesis::DynamicCast<Noesis::TextBox*>(focusedElement);
+            Noesis::TextBox *focusedTextBox =
+                Noesis::DynamicCast<Noesis::TextBox *>(focusedElement);
             if (focusedTextBox) {
                 // User is typing in a text box - don't process shortcuts
                 return false; // Let the TextBox handle all keys
@@ -205,10 +194,11 @@ bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
         }
         // Handle R key for recording testimony
         if (key == Noesis::Key_R && dialogueSystem.IsRecordableMessageHovered()) {
-            const DialogueMode::DialogueEntry* entry = dialogueSystem.GetHoveredEntry();
+            const DialogueMode::DialogueEntry *entry = dialogueSystem.GetHoveredEntry();
             if (entry) {
                 caseboardSystem.AddTestimonyCard(entry->speaker, entry->message);
-                dialogueSystem.MarkHoveredAsRecorded(); // Mark as recorded so it won't show indicator again
+                dialogueSystem
+                    .MarkHoveredAsRecorded(); // Mark as recorded so it won't show indicator again
                 ShowNotification("Testimony added to caseboard");
                 wi::backlog::post("Recorded testimony from ");
                 wi::backlog::post(entry->speaker.c_str());
@@ -266,7 +256,8 @@ void NoesisRenderPath::SetThirdPersonMode(bool enabled) {
 
         mouseInitialized = false;
 
-        wi::backlog::post("Walkabout control mode enabled. Mouse captured for third-person camera.\n");
+        wi::backlog::post(
+            "Walkabout control mode enabled. Mouse captured for third-person camera.\n");
     } else {
         ShowCursor(TRUE);
         ClipCursor(nullptr);
@@ -308,9 +299,7 @@ void NoesisRenderPath::SetFirstPersonMode(bool enabled) {
     }
 }
 
-void NoesisRenderPath::ToggleFullscreen() {
-    gameStartup.ToggleFullscreen(windowHandle);
-}
+void NoesisRenderPath::ToggleFullscreen() { gameStartup.ToggleFullscreen(windowHandle); }
 
 // ========== RENDERPATH LIFECYCLE ==========
 
@@ -321,7 +310,9 @@ void NoesisRenderPath::Start() {
     wi::audio::Initialize();
 
     InitializeNoesis();
-    gameStartup.LoadConfig();
+    
+    // Note: LoadConfig() is now called earlier in main.cc before ActivatePath,
+    // so project paths are set before refresh_material_library() is called.
 }
 
 void NoesisRenderPath::Stop() {
@@ -874,9 +865,7 @@ void NoesisRenderPath::InitializeNoesis() {
                               recordIndicator.GetPtr(), dialogueByeButton.GetPtr());
 
     // Set up dialogue exit callback
-    dialogueSystem.SetExitRequestCallback([this]() {
-        ExitDialogueMode();
-    });
+    dialogueSystem.SetExitRequestCallback([this]() { ExitDialogueMode(); });
 
     caseboardSystem.Initialize(caseboardPanel.GetPtr(), caseboardContent.GetPtr(),
                                caseboardDebugText.GetPtr(), windowHandle);
@@ -901,10 +890,8 @@ void NoesisRenderPath::InitializeNoesis() {
 
         gameStartup.StopMenuMusic();
 
+        // Scene is already loaded during initialization, just initialize camera
         wi::scene::Scene &scene = wi::scene::GetScene();
-        gameStartup.LoadGameScene(scene);
-
-        // Initialize camera angles if player was spawned
         wi::ecs::Entity playerCharacter = gameStartup.GetPlayerCharacter();
         if (playerCharacter != wi::ecs::INVALID_ENTITY) {
             wi::scene::CharacterComponent *playerChar =
@@ -988,7 +975,7 @@ void NoesisRenderPath::ShutdownNoesis() {
     Noesis::GUI::Shutdown();
 }
 
-void NoesisRenderPath::ShowNotification(const char* message) {
+void NoesisRenderPath::ShowNotification(const char *message) {
     if (!notificationText)
         return;
 

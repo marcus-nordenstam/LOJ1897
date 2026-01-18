@@ -6,9 +6,9 @@
 #include <NsGui/Grid.h>
 #include <NsGui/TextBox.h>
 
+#include <functional>
 #include <string>
 #include <vector>
-#include <functional>
 
 // Game startup/shutdown system for config, scene loading, characters, NPC scripts, music
 class GameStartup {
@@ -40,14 +40,16 @@ class GameStartup {
     bool IsMusicPlaying() const { return menuMusicInstance.IsValid(); }
 
     // Helper to find animation entity by name substring
-    wi::ecs::Entity FindAnimationByName(const wi::scene::Scene &scene, const char *anim_name_substr);
+    wi::ecs::Entity FindAnimationByName(const wi::scene::Scene &scene,
+                                        const char *anim_name_substr);
 
     // Spawn characters from scene metadata
     void SpawnCharactersFromMetadata(wi::scene::Scene &scene);
 
     // Spawn a single character
     wi::ecs::Entity SpawnCharacter(wi::scene::Scene &scene, const std::string &modelPath,
-                                   const XMFLOAT3 &position, const XMFLOAT3 &forward, bool isPlayer);
+                                   const XMFLOAT3 &position, const XMFLOAT3 &forward,
+                                   bool isPlayer);
 
     // NPC script management
     void LoadNPCScripts();
@@ -60,7 +62,7 @@ class GameStartup {
     void ToggleFullscreen(HWND windowHandle);
 
     // Getters for state
-    const std::string &GetProjectPath() const { return projectPath; }
+    const std::string &GetProjectPath() const { return wi::Project::ptr()->path; }
     const std::string &GetLevelPath() const { return levelPath; }
     wi::ecs::Entity GetPlayerCharacter() const { return playerCharacter; }
     const std::vector<wi::ecs::Entity> &GetNPCEntities() const { return npcEntities; }
@@ -89,13 +91,10 @@ class GameStartup {
     Noesis::Ptr<Noesis::Button> fullscreenButton;
 
     // Saved settings
-    std::string projectPath;
     std::string themeMusic;
     std::string levelPath;
     std::string playerModel;
     std::string npcModel;
-    std::string animLib;
-    std::string expressionPath;
 
     // Animation library entities
     std::vector<wi::ecs::Entity> animationLibrary;

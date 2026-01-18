@@ -2,6 +2,7 @@
 
 #include <Systems/animation_system.h>
 #include <Systems/character_system.h>
+#include <wiPhysics.h>
 
 #include <NsGui/Enums.h>
 
@@ -71,99 +72,74 @@ void GameStartup::SaveConfig() {
     std::string configPath = GetConfigFilePath();
     std::ofstream configFile(configPath);
     if (configFile.is_open()) {
-        configFile << "project_path = " << projectPath << "\n";
+        configFile << "# LOJ1897 Configuration File\n";
+        configFile << "# This file is read by both wi::Config (for project initialization)\n";
+        configFile << "# and by the game for LOJ-specific settings\n\n";
+
+        // Project path - used by wi::Config for project initialization
+        configFile << "project_path = " << GetProjectPath() << "\n\n";
+
+        // LOJ-game specific settings
+        configFile << "# Game-specific settings\n";
+        configFile << "anim_lib = " << wi::Project::ptr()->anim_library_path << "\n";
+        configFile << "expression_path = " << wi::Project::ptr()->expression_library_path << "\n";
         configFile << "theme_music = " << themeMusic << "\n";
         configFile << "level = " << levelPath << "\n";
         configFile << "player_model = " << playerModel << "\n";
         configFile << "npc_model = " << npcModel << "\n";
-        configFile << "anim_lib = " << animLib << "\n";
-        configFile << "expression_path = " << expressionPath << "\n";
         configFile.close();
 
         char buffer[512];
-        sprintf_s(buffer, "Saved config: project_path = %s\n", projectPath.c_str());
+        sprintf_s(buffer, "Saved config: project_path = %s\n", GetProjectPath().c_str());
         wi::backlog::post(buffer);
     }
 }
 
 void GameStartup::LoadConfig() {
     std::string configPath = GetConfigFilePath();
-    std::ifstream configFile(configPath);
-    if (configFile.is_open()) {
-        std::string line;
-        while (std::getline(configFile, line)) {
-            size_t equalsPos = line.find('=');
-            if (equalsPos != std::string::npos) {
-                std::string key = line.substr(0, equalsPos);
-                std::string value = line.substr(equalsPos + 1);
 
-                // Trim whitespace
-                key.erase(0, key.find_first_not_of(" \t\r\n"));
-                key.erase(key.find_last_not_of(" \t\r\n") + 1);
-                value.erase(0, value.find_first_not_of(" \t\r\n"));
-                value.erase(value.find_last_not_of(" \t\r\n") + 1);
-
-                // Remove quotes
-                if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
-                    value = value.substr(1, value.size() - 2);
-                }
-
-                if (key == "project_path") {
-                    projectPath = value;
-                } else if (key == "theme_music") {
-                    themeMusic = value;
-                } else if (key == "level") {
-                    levelPath = value;
-                } else if (key == "player_model") {
-                    playerModel = value;
-                } else if (key == "npc_model") {
-                    npcModel = value;
-                } else if (key == "anim_lib") {
-                    animLib = value;
-                } else if (key == "expression_path") {
-                    expressionPath = value;
-                }
-            }
-        }
-        configFile.close();
-
-        char buffer[512];
-        sprintf_s(buffer, "Loaded config:\n  project_path = %s\n  theme_music = %s\n  level = %s\n",
-                  projectPath.c_str(), themeMusic.c_str(), levelPath.c_str());
-        wi::backlog::post(buffer);
+    // Use wi::config::File to load config.ini
+    wi::config::File config;
+    if (!config.Open(configPath.c_str())) {
+        wi::backlog::post("ERROR: Failed to open config.ini\n");
+        UpdateControlStates();
+        return;
     }
+
+    // First, initialize the project using wi::Config
+    wi::Project::ptr()->InitializeFromConfig(config);
+    wi::backlog::post("Initialized project from config.ini using wi::Config\n");
+
+    // Now read LOJ-game specific settings from the config
+    if (config.HasSection("game")) {
+        auto &game = config.GetSection("game");
+        themeMusic = game.GetText("theme_music");
+        levelPath = game.GetText("level");
+        playerModel = game.GetText("player_model");
+        npcModel = game.GetText("npc_model");
+    }
+
+    char buffer[512];
+    sprintf_s(buffer,
+              "Loaded LOJ-game config:\n  project_path = %s\n  theme_music = %s\n  level = %s\n",
+              GetProjectPath().c_str(), themeMusic.c_str(), levelPath.c_str());
+    wi::backlog::post(buffer);
 
     UpdateControlStates();
 }
 
 void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
-    if (projectPath.empty()) {
-        wi::backlog::post("Cannot initialize animation system: project_path not set\n");
-        return;
-    }
-
     // Load animation library
+    const auto animLib = GetProjectPath() + wi::Project::ptr()->anim_library_path;
     if (!animLib.empty()) {
-        std::string fullAnimLibPath = projectPath;
-        if (!fullAnimLibPath.empty() && fullAnimLibPath.back() != '/' &&
-            fullAnimLibPath.back() != '\\') {
-            fullAnimLibPath += "\\";
-        }
-        fullAnimLibPath += animLib;
-
-        for (char &c : fullAnimLibPath) {
-            if (c == '/')
-                c = '\\';
-        }
-
         char buffer[512];
-        sprintf_s(buffer, "Loading animation library: %s\n", fullAnimLibPath.c_str());
+        sprintf_s(buffer, "Loading animation library: %s\n", animLib.c_str());
         wi::backlog::post(buffer);
 
-        if (wi::helper::FileExists(fullAnimLibPath)) {
+        if (wi::helper::FileExists(animLib)) {
             wi::scene::Scene animScene;
-            wi::Archive archive(fullAnimLibPath);
-            archive.SetSourceDirectory(wi::helper::InferProjectPath(fullAnimLibPath));
+            wi::Archive archive(animLib);
+            archive.SetSourceDirectory(wi::helper::InferProjectPath(animLib));
             if (archive.IsOpen()) {
                 animScene.Serialize(archive);
 
@@ -186,11 +162,11 @@ void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
                 wi::backlog::post(buffer);
             } else {
                 sprintf_s(buffer, "ERROR: Failed to open animation library archive: %s\n",
-                          fullAnimLibPath.c_str());
+                          animLib.c_str());
                 wi::backlog::post(buffer);
             }
         } else {
-            sprintf_s(buffer, "ERROR: Animation library not found: %s\n", fullAnimLibPath.c_str());
+            sprintf_s(buffer, "ERROR: Animation library not found: %s\n", animLib.c_str());
             wi::backlog::post(buffer);
         }
     } else {
@@ -198,14 +174,12 @@ void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
     }
 
     // Load expressions
+    const auto expressionPath = wi::Project::ptr()->expression_library_path;
     if (!expressionPath.empty()) {
         char buffer[512];
-        sprintf_s(buffer, "Loading expressions from: %s (project: %s)\n", expressionPath.c_str(),
-                  projectPath.c_str());
+        sprintf_s(buffer, "Loading expressions from: %s\n", expressionPath.c_str());
         wi::backlog::post(buffer);
-
-        scene.LoadExpressions(expressionPath, projectPath);
-
+        scene.LoadExpressions(expressionPath, GetProjectPath());
         wi::backlog::post("Expressions loaded successfully\n");
     } else {
         wi::backlog::post("No expression path (expression_path) configured in config.ini\n");
@@ -213,7 +187,7 @@ void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
 }
 
 void GameStartup::UpdateControlStates() {
-    bool hasProjectPath = !projectPath.empty();
+    bool hasProjectPath = !GetProjectPath().empty();
 
     if (seedTextBox) {
         seedTextBox->SetIsEnabled(hasProjectPath);
@@ -238,7 +212,7 @@ void GameStartup::LoadAndPlayMenuMusic() {
         return;
     }
 
-    std::string musicPath = projectPath;
+    std::string musicPath = GetProjectPath();
     if (!musicPath.empty() && musicPath.back() != '/' && musicPath.back() != '\\') {
         musicPath += "\\";
     }
@@ -360,7 +334,7 @@ void GameStartup::SpawnCharactersFromMetadata(wi::scene::Scene &scene) {
 wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::string &modelPath,
                                             const XMFLOAT3 &position, const XMFLOAT3 &forward,
                                             bool isPlayer) {
-    std::string fullModelPath = projectPath;
+    std::string fullModelPath = GetProjectPath();
     if (!fullModelPath.empty() && fullModelPath.back() != '/' && fullModelPath.back() != '\\') {
         fullModelPath += "\\";
     }
@@ -423,10 +397,10 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
     wi::scene::TransformComponent *transform = scene.transforms.GetComponent(characterEntity);
     if (transform == nullptr) {
         transform = &scene.transforms.Create(characterEntity);
-        transform->ClearTransform();
-        transform->Translate(position);
-        transform->UpdateTransform();
     }
+    transform->ClearTransform();
+    transform->Translate(position);
+    transform->UpdateTransform();
 
     wi::scene::LayerComponent *layer = scene.layers.GetComponent(characterEntity);
     if (layer == nullptr) {
@@ -500,7 +474,7 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
 }
 
 void GameStartup::LoadNPCScripts() {
-    std::string basePath = projectPath;
+    std::string basePath = GetProjectPath();
     if (!basePath.empty() && basePath.back() != '/' && basePath.back() != '\\') {
         basePath += "/";
     }
@@ -564,6 +538,9 @@ void GameStartup::CleanupNPCScripts() {
 void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
     auto startTime = std::chrono::high_resolution_clock::now();
 
+    // Set the master scene in the project so materials can be properly managed
+    wi::Project::ptr()->master_scene = &scene;
+
     if (levelPath.empty()) {
         wi::backlog::post("ERROR: No level path configured in config.ini\n");
         auto endTime = std::chrono::high_resolution_clock::now();
@@ -574,7 +551,7 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
         return;
     }
 
-    std::string scenePath = projectPath;
+    std::string scenePath = GetProjectPath();
     if (!scenePath.empty() && scenePath.back() != '/' && scenePath.back() != '\\') {
         scenePath += "\\";
     }
@@ -608,9 +585,69 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
 
         wi::backlog::post("Scene loaded successfully\n");
 
+        // Wait for resource loading jobs to complete
+        wi::jobsystem::Wait(wi::jobsystem::context());
+
         InitializeAnimationSystem(scene);
 
+        // Wait for any animation/expression loading jobs
+        wi::jobsystem::Wait(wi::jobsystem::context());
+
+        // After scene deserialization, resources are loaded with IMPORT_DELAY flag,
+        // meaning they have handles but no actual GPU data yet.
+        // We must call CreateRenderData() on all materials to trigger actual texture loading
+        // before Scene::Update() tries to access them via RunMaterialUpdateSystem.
+        auto project = wi::Project::ptr();
+        for (size_t i = 0; i < project->material_library.size(); ++i) {
+            project->material_library[i].CreateRenderData();
+        }
+        wi::jobsystem::Wait(wi::jobsystem::context());
+        sprintf_s(buffer, "Material render data created for %zu materials\n",
+                  project->material_library.size());
+        wi::backlog::post(buffer);
+
+        // CRITICAL: Find spawn position and set camera BEFORE first update
+        // This ensures terrain generates chunks at the correct location
+        XMFLOAT3 spawnPosition = XMFLOAT3(0, 0, 0);
+        for (size_t i = 0; i < scene.metadatas.GetCount(); i++) {
+            const wi::scene::MetadataComponent &metadata = scene.metadatas[i];
+            if (metadata.preset == wi::scene::MetadataComponent::Preset::Player) {
+                wi::scene::TransformComponent *spawnTransform =
+                    scene.transforms.GetComponent(scene.metadatas.GetEntity(i));
+                if (spawnTransform) {
+                    spawnPosition = spawnTransform->GetPosition();
+                    break;
+                }
+            }
+        }
+
+        // Position camera at spawn location so terrain generates correct chunks
+        scene.camera.Eye = spawnPosition;
+        scene.camera.At = XMFLOAT3(spawnPosition.x, spawnPosition.y, spawnPosition.z + 1.0f);
+        scene.camera.UpdateCamera();
+
+        sprintf_s(buffer, "Camera positioned at spawn: (%.2f, %.2f, %.2f)\n", spawnPosition.x,
+                  spawnPosition.y, spawnPosition.z);
+        wi::backlog::post(buffer);
+
+        // First update with dt=0 to initialize non-terrain systems
         scene.Update(0.0f);
+
+        // CRITICAL: Update with small positive dt to trigger terrain generation!
+        // Terrain Generation_Update only runs when dt > 0
+        scene.Update(0.016f); // ~60fps timestep
+
+        // Wait for terrain generation jobs to complete
+        wi::jobsystem::Wait(wi::jobsystem::context());
+
+        // Additional updates to ensure terrain BVH is built and ready
+        for (int i = 0; i < 3; i++) {
+            scene.Update(0.016f);
+            wi::jobsystem::Wait(wi::jobsystem::context());
+        }
+
+        // Enable physics simulation for character collision with ground
+        wi::physics::SetSimulationEnabled(true);
 
         SpawnCharactersFromMetadata(scene);
 

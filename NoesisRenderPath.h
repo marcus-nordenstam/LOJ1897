@@ -28,6 +28,7 @@
 #include <NsGui/Canvas.h>
 #include <NsGui/DropShadowEffect.h>
 #include <NsGui/Enums.h>
+#include <NsGui/FocusManager.h>
 #include <NsGui/FontFamily.h>
 #include <NsGui/FontProperties.h>
 #include <NsGui/Grid.h>
@@ -36,7 +37,6 @@
 #include <NsGui/Image.h>
 #include <NsGui/InputEnums.h>
 #include <NsGui/IntegrationAPI.h>
-#include <NsGui/FocusManager.h>
 #include <NsGui/Panel.h>
 #include <NsGui/ScaleTransform.h>
 #include <NsGui/ScrollViewer.h>
@@ -67,16 +67,17 @@
 
 // Noesis integration for Wicked Engine
 class NoesisRenderPath : public wi::RenderPath3D {
-  private:
-    Noesis::Ptr<Noesis::RenderDevice> noesisDevice;
-    Noesis::Ptr<Noesis::IView> uiView;
-    Noesis::Ptr<Noesis::FrameworkElement> rootElement; // Root element from XAML
-
+  public:
     // Gameplay subsystems
     DialogueMode dialogueSystem;
     CaseboardMode caseboardSystem;
     PhotoMode cameraSystem;
     GameStartup gameStartup;
+
+  private:
+    Noesis::Ptr<Noesis::RenderDevice> noesisDevice;
+    Noesis::Ptr<Noesis::IView> uiView;
+    Noesis::Ptr<Noesis::FrameworkElement> rootElement; // Root element from XAML
 
     ID3D12Fence *frameFence = nullptr;
     uint64_t startTime = 0;
@@ -198,5 +199,5 @@ class NoesisRenderPath : public wi::RenderPath3D {
 
     void InitializeNoesis();
     void ShutdownNoesis();
-    void ShowNotification(const char* message);
+    void ShowNotification(const char *message);
 };

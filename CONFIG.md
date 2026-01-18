@@ -51,12 +51,24 @@ expression_path = SharedContent\Expressions
 - Paths can use either forward slashes or backslashes
 - Values can be enclosed in quotes which will be automatically removed
 - Spaces around the equals sign are trimmed automatically
+- Comment lines starting with '#' are ignored
 - If the config.ini file is not found or the project_path is empty the game controls will be disabled
 - The configuration is automatically saved when the application exits
-- On startup:
-  - The animation library (anim_lib) is loaded and merged into the scene if specified
-  - Expression presets (.esp files) are loaded from the expression_path folder if specified
-  - These are required by the action system for character animations and facial expressions
+
+### Loading Process
+
+On startup, the config.ini file is loaded in two stages:
+
+1. **Project Initialization**: The config file is first passed to `wi::Project::InitializeFromConfig()` which initializes the Wicked Engine project system, including setting the project_path (accessible via `wi::Project::ptr()->rootPath`)
+
+2. **Game-Specific Settings**: After project initialization, the config file is re-read to load LOJ-game specific settings:
+   - theme_music - Music to play in the main menu
+   - level - Scene file to load when Play Game is pressed
+   - player_model - Character model for player spawns
+   - npc_model - Character model for NPC spawns
+   - anim_lib - Animation library loaded and merged into the scene
+   - expression_path - Expression presets (.esp files) required by the action system
+
 - When Play Game is pressed:
   - The main menu will be hidden
   - The menu music will stop playing
