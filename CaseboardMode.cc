@@ -54,14 +54,14 @@ static void UpdatePinColor(Noesis::Image *pinImage, bool hovering) {
 
     if (hovering) {
         // Scale up and brighten when hovering (scale from center)
-        pinImage->SetOpacity(1.0f);
+        pinImage->SetOpacity(1.f);
         Noesis::Ptr<Noesis::ScaleTransform> scale = Noesis::MakePtr<Noesis::ScaleTransform>();
         scale->SetScaleX(32.0f / 24.0f); // Scale from 24 to 32
         scale->SetScaleY(32.0f / 24.0f);
         pinImage->SetRenderTransform(scale);
     } else {
         // Normal size (no transform)
-        pinImage->SetOpacity(0.8f);
+        pinImage->SetOpacity(1.f);
         pinImage->SetRenderTransform(nullptr);
     }
 }
@@ -1128,9 +1128,9 @@ void CaseboardMode::AddTestimonyCard(const std::string &speaker, const std::stri
     // Add drop shadow to entire card
     Noesis::Ptr<Noesis::DropShadowEffect> shadow = Noesis::MakePtr<Noesis::DropShadowEffect>();
     shadow->SetColor(Noesis::Color(0, 0, 0));
-    shadow->SetBlurRadius(10.0f);
+    shadow->SetBlurRadius(1.0f);
     shadow->SetShadowDepth(4.0f);
-    shadow->SetOpacity(0.5f);
+    shadow->SetOpacity(0.9f);
     cardContainer->SetEffect(shadow);
 
     // Add pin image at top center (added last to ensure it renders on top of other elements)
@@ -1390,8 +1390,8 @@ void CaseboardMode::AddCaseFile(const std::string &photoFilename, const std::str
     // Add drop shadow effect to entire file
     Noesis::Ptr<Noesis::DropShadowEffect> shadowEffect = *new Noesis::DropShadowEffect();
     shadowEffect->SetColor(Noesis::Color(0, 0, 0));
-    shadowEffect->SetOpacity(0.6f);
-    shadowEffect->SetBlurRadius(12.0f);
+    shadowEffect->SetOpacity(0.9f);
+    shadowEffect->SetBlurRadius(1.0f);
     shadowEffect->SetShadowDepth(5.0f);
     fileContainer->SetEffect(shadowEffect);
 
@@ -1803,8 +1803,8 @@ void CaseboardMode::AddPhotoCard(const std::string &photoFilename) {
     // Add drop shadow effect to entire card (matching Unreal shadow rendering)
     Noesis::Ptr<Noesis::DropShadowEffect> shadowEffect = *new Noesis::DropShadowEffect();
     shadowEffect->SetColor(Noesis::Color(0, 0, 0));
-    shadowEffect->SetOpacity(0.5f);
-    shadowEffect->SetBlurRadius(12.0f);
+    shadowEffect->SetOpacity(0.9f);
+    shadowEffect->SetBlurRadius(1.0f);
     shadowEffect->SetShadowDepth(6.0f);
     photoContainer->SetEffect(shadowEffect);
 
