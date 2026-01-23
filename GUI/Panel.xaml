@@ -442,7 +442,7 @@
                 <!-- Case Card: SUSPECT -->
                 <Grid Margin="15" ClipToBounds="False">
                     <Image x:Name="CaseCard_Suspect"
-                           Source="GUI/Cards/CASE_CARD SUSPECT.png"
+                           Source="GUI/Cards/CASE_CARD_SUSPECT.png"
                            Width="180">
                         <Image.Effect>
                             <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="5" Opacity="0.6"/>

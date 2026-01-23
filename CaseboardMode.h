@@ -37,7 +37,7 @@ class CaseboardMode {
     struct Connection {
         int cardAIndex = -1; // Index in respective card array
         int cardBIndex = -1;
-        int cardAType = -1; // 0=Note, 1=Photo, 2=Testimony, 3=CaseFile
+        int cardAType = -1; // 0=Note, 1=Photo, 2=Testimony, 3=CaseFile, 4=CaseCard
         int cardBType = -1;
     };
 
@@ -48,6 +48,8 @@ class CaseboardMode {
         Noesis::Ptr<Noesis::TextBlock> textLabel;
         float boardX = 0.0f;
         float boardY = 0.0f;
+        float width = 180.0f;
+        float height = 232.0f;
         bool isEditing = false;
         std::string savedText;
         Pin pin;
@@ -91,6 +93,17 @@ class CaseboardMode {
         std::vector<CaseFileField> fields;
     };
 
+    // Case cards (static black cards: VICTIM, SUSPECT, MOTIVE, etc.)
+    struct CaseCard {
+        Noesis::Ptr<Noesis::Grid> container; // Grid containing the card image and pin
+        Noesis::Ptr<Noesis::Image> cardImage; // The card image itself
+        float boardX = 0.0f;
+        float boardY = 0.0f;
+        float width = 180.0f;  // Same as other cards
+        float height = 232.0f;  // Same as other cards
+        Pin pin;
+    };
+
     // Case-file cards (NPC dossiers with multiple pages)
     struct CaseFile {
         Noesis::Ptr<Noesis::Canvas> container;
@@ -110,7 +123,7 @@ class CaseboardMode {
         std::string npcName;
         std::string photoFilename;
         float width = 200.0f; // 180 + 20 (tab)
-        float height = 232.0f;
+        float height = 150.0f; // Shorter folder shape
         Pin pin;
     };
 
@@ -271,6 +284,9 @@ class CaseboardMode {
     // Get testimony cards
     const std::vector<TestimonyCard> &GetTestimonyCards() const { return testimonyCards; }
 
+    // Get case cards
+    const std::vector<CaseCard> &GetCaseCards() const { return caseCards; }
+
     // Pin and connection management
     bool HitTestPin(int cardType, int cardIndex, float boardX, float boardY);
     void StartConnection(int cardType, int cardIndex);
@@ -298,10 +314,11 @@ class CaseboardMode {
     // Window handle for size calculations
     HWND windowHandle = nullptr;
 
-    // Note cards, photo cards, testimony cards, and case files
+    // Note cards, photo cards, testimony cards, case cards, and case files
     std::vector<NoteCard> noteCards;
     std::vector<PhotoCard> photoCards;
     std::vector<TestimonyCard> testimonyCards;
+    std::vector<CaseCard> caseCards;
     std::vector<CaseFile> caseFiles;
     std::vector<Noesis::Ptr<Noesis::BitmapSource>> capturedPhotoTextures;
 
@@ -322,7 +339,7 @@ class CaseboardMode {
 
     // Connection dragging state
     bool draggingConnection = false;
-    int dragStartCardType = -1; // 0=Note, 1=Photo, 2=Testimony, 3=CaseFile
+    int dragStartCardType = -1; // 0=Note, 1=Photo, 2=Testimony, 3=CaseFile, 4=CaseCard
     int dragStartCardIndex = -1;
     float dragConnectionX = 0.0f;
     float dragConnectionY = 0.0f;
@@ -330,6 +347,9 @@ class CaseboardMode {
 
     // Rendered connection paths (separate from logical connections)
     std::vector<Noesis::Ptr<Noesis::Path>> connectionPaths;
+
+    // Debug visualization
+    std::vector<Noesis::Ptr<Noesis::FrameworkElement>> debugRectangles;
 
     // State
     bool inCaseboardMode = false;
