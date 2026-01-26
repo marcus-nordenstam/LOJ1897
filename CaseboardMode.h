@@ -1,6 +1,6 @@
 #pragma once
 
-#include "WickedEngine.h"
+#include "GrymEngine.h"
 
 #include <NsGui/BitmapImage.h>
 #include <NsGui/Border.h>
@@ -95,12 +95,12 @@ class CaseboardMode {
 
     // Case cards (static black cards: VICTIM, SUSPECT, MOTIVE, etc.)
     struct CaseCard {
-        Noesis::Ptr<Noesis::Grid> container; // Grid containing the card image and pin
+        Noesis::Ptr<Noesis::Grid> container;  // Grid containing the card image and pin
         Noesis::Ptr<Noesis::Image> cardImage; // The card image itself
         float boardX = 0.0f;
         float boardY = 0.0f;
         float width = 180.0f;  // Same as other cards
-        float height = 232.0f;  // Same as other cards
+        float height = 232.0f; // Same as other cards
         Pin pin;
     };
 
@@ -122,7 +122,7 @@ class CaseboardMode {
         float boardY = 0.0f;
         std::string npcName;
         std::string photoFilename;
-        float width = 200.0f; // 180 + 20 (tab)
+        float width = 200.0f;  // 180 + 20 (tab)
         float height = 150.0f; // Shorter folder shape
         Pin pin;
     };

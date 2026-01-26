@@ -1,5 +1,5 @@
+#include "GrymEngine.h"
 #include "NoesisRenderPath.h"
-#include "WickedEngine.h"
 #include <NsGui/InputEnums.h>
 #include <Windows.h>
 #include <fstream>
@@ -445,7 +445,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     std::string exeDir = wi::helper::GetDirectoryFromPath(exePath);
 
     // Setup shader paths (using pre-compiled shaders only)
-    // WickedEngine expects platform-specific subdirectory (hlsl6/ for DX12)
+    // GrymEngine expects platform-specific subdirectory (hlsl6/ for DX12)
     wi::renderer::SetShaderPath(exeDir + "shaders/");
     wi::renderer::SetShaderPath(wi::renderer::GetShaderPath() + "hlsl6/");
 
@@ -458,6 +458,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
     // Load config FIRST to set project paths (like Editor does with InitializeFromConfig)
     noesisRenderPath.gameStartup.LoadConfig();
+
+    // Configure graphics settings to match Editor for consistent rendering quality
+    // These settings are critical for proper fog/particle alpha blending
+    noesisRenderPath.setSSREnabled(true);   // Screen Space Reflections
+    noesisRenderPath.setMSAASampleCount(4); // MSAA 4x (Editor: msaa=3, critical for alpha blending)
+    noesisRenderPath.setDitherEnabled(true); // Dithering (Editor: true)
+    noesisRenderPath.setFXAAEnabled(true);   // FXAA (Editor: true)
+    wi::renderer::SetDDGIEnabled(true);      // Enable Dynamic Diffuse Global Illumination
 
     // Initialize application (starts async shader compilation, sets up systems)
     // This must be called before refresh_material_library, same as Editor

@@ -1,14 +1,14 @@
 #pragma once
 
-#include "WickedEngine.h"
+#include "GrymEngine.h"
 
+#include <NsGui/Border.h>
+#include <NsGui/Button.h>
 #include <NsGui/Grid.h>
 #include <NsGui/ScrollViewer.h>
 #include <NsGui/StackPanel.h>
 #include <NsGui/TextBlock.h>
 #include <NsGui/TextBox.h>
-#include <NsGui/Border.h>
-#include <NsGui/Button.h>
 
 #include <string>
 #include <vector>
@@ -79,7 +79,7 @@ class DialogueMode {
     void UpdateDialogueHover(int mouseX, int mouseY);
 
     // Get the hovered dialogue entry (returns nullptr if none hovered or if player message)
-    const DialogueEntry* GetHoveredEntry() const;
+    const DialogueEntry *GetHoveredEntry() const;
 
     // Check if a recordable message is hovered (non-player message that hasn't been recorded)
     bool IsRecordableMessageHovered() const;
@@ -104,7 +104,7 @@ class DialogueMode {
     Noesis::Ptr<Noesis::TextBlock> dialogueHintText;
     Noesis::Ptr<Noesis::FrameworkElement> talkIndicator;
     Noesis::Ptr<Noesis::StackPanel> recordIndicator; // "R - Record Testimony" indicator
-    Noesis::Ptr<Noesis::Button> byeButton; // Exit dialogue button
+    Noesis::Ptr<Noesis::Button> byeButton;           // Exit dialogue button
 
     // State
     bool inDialogueMode = false;

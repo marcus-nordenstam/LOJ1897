@@ -37,12 +37,12 @@ set(RESOURCE_FILES
         app.rc
 )
 
-# Set WickedEngine paths
-set(WICKED_ROOT_DIR "E:/Repos/WickedLOJ" CACHE PATH "Path to WickedLOJ repository root")
-set(WICKED_ENGINE_DIR "${WICKED_ROOT_DIR}/WickedEngine")
-set(WICKED_BUILD_DIR_RELEASE "${WICKED_ROOT_DIR}/cmake-build-release-visual-studio/WickedEngine" CACHE PATH "Path to WickedEngine Release build directory")
-set(WICKED_BUILD_DIR_DEBUG "${WICKED_ROOT_DIR}/cmake-build-debug-visual-studio/WickedEngine" CACHE PATH "Path to WickedEngine Debug build directory")
-set(WICKED_SHADERS_DIR "${WICKED_ROOT_DIR}/cmake-build-release-visual-studio/Editor/shaders" CACHE PATH "Path to pre-compiled shaders")
+# Set GrymEngine paths
+set(GRYM_ROOT_DIR "E:/Repos/GrymEngine" CACHE PATH "Path to GrymEngine repository root")
+set(GRYM_ENGINE_DIR "${GRYM_ROOT_DIR}/Engine")
+set(GRYM_BUILD_DIR_RELEASE "${GRYM_ROOT_DIR}/cmake-build-release-visual-studio/Engine" CACHE PATH "Path to GrymEngine Release build directory")
+set(GRYM_BUILD_DIR_DEBUG "${GRYM_ROOT_DIR}/cmake-build-debug-visual-studio/Engine" CACHE PATH "Path to GrymEngine Debug build directory")
+set(GRYM_SHADERS_DIR "${GRYM_ROOT_DIR}/cmake-build-release-visual-studio/Editor/shaders" CACHE PATH "Path to pre-compiled shaders")
 
 # Set NoesisGUI paths
 set(NOESISGUI_ROOT_DIR "E:/3rdparty/NoesisGUI-NativeSDK-win-3.2.10-Indie" CACHE PATH "Path to NoesisGUI root directory")
@@ -72,35 +72,35 @@ set(NOESIS_PROVIDERS_SOURCE_FILES
         ${NOESISGUI_ROOT_DIR}/Src/Packages/App/Providers/Src/App.Providers.cpp
 )
 
-# Create imported targets for WickedEngine dependencies
+# Create imported targets for GrymEngine dependencies
 add_library(Jolt STATIC IMPORTED)
 set_target_properties(Jolt PROPERTIES
-        IMPORTED_LOCATION_RELEASE "${WICKED_BUILD_DIR_RELEASE}/Jolt.lib"
-        IMPORTED_LOCATION_DEBUG "${WICKED_BUILD_DIR_DEBUG}/Jolt.lib"
-        IMPORTED_LOCATION "${WICKED_BUILD_DIR_RELEASE}/Jolt.lib"
+        IMPORTED_LOCATION_RELEASE "${GRYM_BUILD_DIR_RELEASE}/Jolt.lib"
+        IMPORTED_LOCATION_DEBUG "${GRYM_BUILD_DIR_DEBUG}/Jolt.lib"
+        IMPORTED_LOCATION "${GRYM_BUILD_DIR_RELEASE}/Jolt.lib"
 )
 
 add_library(LUA STATIC IMPORTED)
 set_target_properties(LUA PROPERTIES
-        IMPORTED_LOCATION_RELEASE "${WICKED_BUILD_DIR_RELEASE}/LUA/LUA.lib"
-        IMPORTED_LOCATION_DEBUG "${WICKED_BUILD_DIR_DEBUG}/LUA/LUA.lib"
-        IMPORTED_LOCATION "${WICKED_BUILD_DIR_RELEASE}/LUA/LUA.lib"
+        IMPORTED_LOCATION_RELEASE "${GRYM_BUILD_DIR_RELEASE}/LUA/LUA.lib"
+        IMPORTED_LOCATION_DEBUG "${GRYM_BUILD_DIR_DEBUG}/LUA/LUA.lib"
+        IMPORTED_LOCATION "${GRYM_BUILD_DIR_RELEASE}/LUA/LUA.lib"
 )
 
 add_library(Utility STATIC IMPORTED)
 set_target_properties(Utility PROPERTIES
-        IMPORTED_LOCATION_RELEASE "${WICKED_BUILD_DIR_RELEASE}/Utility/Utility.lib"
-        IMPORTED_LOCATION_DEBUG "${WICKED_BUILD_DIR_DEBUG}/Utility/Utility.lib"
-        IMPORTED_LOCATION "${WICKED_BUILD_DIR_RELEASE}/Utility/Utility.lib"
+        IMPORTED_LOCATION_RELEASE "${GRYM_BUILD_DIR_RELEASE}/Utility/Utility.lib"
+        IMPORTED_LOCATION_DEBUG "${GRYM_BUILD_DIR_DEBUG}/Utility/Utility.lib"
+        IMPORTED_LOCATION "${GRYM_BUILD_DIR_RELEASE}/Utility/Utility.lib"
 )
 
-# Create imported target for WickedEngine with configuration-specific libraries
-add_library(WickedEngine STATIC IMPORTED)
-set_target_properties(WickedEngine PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${WICKED_ENGINE_DIR}
-        IMPORTED_LOCATION_RELEASE "${WICKED_BUILD_DIR_RELEASE}/WickedEngine.lib"
-        IMPORTED_LOCATION_DEBUG "${WICKED_BUILD_DIR_DEBUG}/WickedEngine.lib"
-        IMPORTED_LOCATION "${WICKED_BUILD_DIR_RELEASE}/WickedEngine.lib"  # Default to Release
+# Create imported target for GrymEngine with configuration-specific libraries
+add_library(GrymEngine STATIC IMPORTED)
+set_target_properties(GrymEngine PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES ${GRYM_ENGINE_DIR}
+        IMPORTED_LOCATION_RELEASE "${GRYM_BUILD_DIR_RELEASE}/GrymEngine_Windows.lib"
+        IMPORTED_LOCATION_DEBUG "${GRYM_BUILD_DIR_DEBUG}/GrymEngine_Windows.lib"
+        IMPORTED_LOCATION "${GRYM_BUILD_DIR_RELEASE}/GrymEngine_Windows.lib"  # Default to Release
         INTERFACE_LINK_LIBRARIES "Jolt;LUA;Utility"
 )
 
@@ -120,7 +120,7 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CM
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
-        ${WICKED_ENGINE_DIR}
+        ${GRYM_ENGINE_DIR}
         ${NOESISGUI_INCLUDE_DIR}
         ${NOESISGUI_ROOT_DIR}/Src/Packages/Render/D3D12RenderDevice/Include
         ${NOESISGUI_ROOT_DIR}/Src/Packages/Render/D3D12RenderContext/Src
@@ -130,9 +130,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         ${NOESISGUI_ROOT_DIR}/Src/Packages/App/MediaElement/Include
 )
 
-# Link against WickedEngine library and its dependencies
+# Link against GrymEngine library and its dependencies
 target_link_libraries(${PROJECT_NAME} PUBLIC
-        WickedEngine
+        GrymEngine
         Jolt
         LUA
         Utility
@@ -162,7 +162,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
         WIN32_EXECUTABLE YES
 )
 
-if (WICKED_ENABLE_IPO)
+if (GRYM_ENABLE_IPO)
     set_target_properties(${PROJECT_NAME} PROPERTIES
             INTERPROCEDURAL_OPTIMIZATION ON
             INTERPROCEDURAL_OPTIMIZATION_DEBUG OFF
@@ -170,7 +170,7 @@ if (WICKED_ENABLE_IPO)
 endif ()
 
 set(PLATFORM "Windows")
-add_compile_definitions(WIN32 _WINDOWS WICKED_CMAKE_BUILD UNICODE _UNICODE)
+add_compile_definitions(WIN32 _WINDOWS GRYM_CMAKE_BUILD UNICODE _UNICODE)
 
 # Define D3D12 render device API as static (not DLL import/export) since we're compiling it into the executable
 # This overrides the default NS_DLL_IMPORT to make the functions available statically
@@ -179,22 +179,22 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
         NS_APP_PROVIDERS_API=
 )
 
-set(LIBDXCOMPILER_PATH "${WICKED_ENGINE_DIR}/${LIB_DXCOMPILER}")
-set(STARTUP_LUA "${WICKED_ROOT_DIR}/Editor/startup.lua")
-message(STATUS "WickedEngine directory: ${WICKED_ENGINE_DIR}")
-message(STATUS "WickedEngine Release build directory: ${WICKED_BUILD_DIR_RELEASE}")
-message(STATUS "WickedEngine Debug build directory: ${WICKED_BUILD_DIR_DEBUG}")
+set(LIBDXCOMPILER_PATH "${GRYM_ENGINE_DIR}/${LIB_DXCOMPILER}")
+set(STARTUP_LUA "${GRYM_ROOT_DIR}/Editor/startup.lua")
+message(STATUS "GrymEngine directory: ${GRYM_ENGINE_DIR}")
+message(STATUS "GrymEngine Release build directory: ${GRYM_BUILD_DIR_RELEASE}")
+message(STATUS "GrymEngine Debug build directory: ${GRYM_BUILD_DIR_DEBUG}")
 
 # Check if Debug library exists
-if (NOT EXISTS "${WICKED_BUILD_DIR_DEBUG}/WickedEngine.lib")
-    message(WARNING "WickedEngine Debug library not found at ${WICKED_BUILD_DIR_DEBUG}/WickedEngine.lib")
-    message(WARNING "You need to build WickedEngine in Debug mode to match your Debug build configuration.")
-    message(WARNING "Alternatively, build LOJ1897 in Release mode to match the existing Release WickedEngine library.")
+if (NOT EXISTS "${GRYM_BUILD_DIR_DEBUG}/GrymEngine_Windows.lib")
+    message(WARNING "GrymEngine Debug library not found at ${GRYM_BUILD_DIR_DEBUG}/GrymEngine_Windows.lib")
+    message(WARNING "You need to build GrymEngine in Debug mode to match your Debug build configuration.")
+    message(WARNING "Alternatively, build LOJ1897 in Release mode to match the existing Release GrymEngine library.")
 endif ()
 
 message(STATUS "libdxcompiler found at ${LIBDXCOMPILER_PATH}")
 message(STATUS "startup lua found at ${STARTUP_LUA}")
-message(STATUS "Pre-compiled shaders: ${WICKED_SHADERS_DIR}")
+message(STATUS "Pre-compiled shaders: ${GRYM_SHADERS_DIR}")
 message(STATUS "NoesisGUI directory: ${NOESISGUI_ROOT_DIR}")
 message(STATUS "NoesisGUI include: ${NOESISGUI_INCLUDE_DIR}")
 message(STATUS "NoesisGUI library: ${NOESISGUI_LIB_DIR}/Noesis.lib")
@@ -207,7 +207,7 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${STARTUP_LUA} ${CMAKE_CURRENT_BINARY_DIR}/startup.lua
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${NOESISGUI_BIN_DIR}/Noesis.dll ${CMAKE_CURRENT_BINARY_DIR}
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/GUI ${CMAKE_CURRENT_BINARY_DIR}/GUI
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${WICKED_SHADERS_DIR} ${CMAKE_CURRENT_BINARY_DIR}/shaders
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${GRYM_SHADERS_DIR} ${CMAKE_CURRENT_BINARY_DIR}/shaders
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Logo.png ${CMAKE_CURRENT_BINARY_DIR}/Logo.png
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/MainMenu.png ${CMAKE_CURRENT_BINARY_DIR}/GUI/MainMenu.png
         COMMENT "Copying required runtime files to build directory"
@@ -240,7 +240,7 @@ add_custom_command(
         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
         -DLIBDXCOMPILER_PATH=${LIBDXCOMPILER_PATH}
         -DNOESISGUI_BIN_DIR=${NOESISGUI_BIN_DIR}
-        -DWICKED_SHADERS_DIR=${WICKED_SHADERS_DIR}
+        -DGRYM_SHADERS_DIR=${GRYM_SHADERS_DIR}
         -DTARGET_FILE=$<TARGET_FILE:${PROJECT_NAME}>
         -P ${CMAKE_CURRENT_SOURCE_DIR}/CreatePublish.cmake
         COMMENT "Creating Publish folder if build configuration is Publish"

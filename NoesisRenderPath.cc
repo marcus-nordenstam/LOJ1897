@@ -310,7 +310,7 @@ void NoesisRenderPath::Start() {
     wi::audio::Initialize();
 
     InitializeNoesis();
-    
+
     // Note: LoadConfig() is now called earlier in main.cc before ActivatePath,
     // so project paths are set before refresh_material_library() is called.
 }
@@ -888,7 +888,7 @@ void NoesisRenderPath::InitializeNoesis() {
             menuContainer->SetVisibility(Noesis::Visibility_Collapsed);
         }
 
-        gameStartup.StopMenuMusic();
+        // gameStartup.StopMenuMusic();
 
         // Scene is already loaded during initialization, just initialize camera
         wi::scene::Scene &scene = wi::scene::GetScene();

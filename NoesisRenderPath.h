@@ -1,11 +1,11 @@
 #pragma once
 
-#include "WickedEngine.h"
+#include "GrymEngine.h"
 #include <wiAudio.h>
 #include <wiGraphicsDevice_DX12.h>
 #include <wiHelper.h>
 
-// Windows.h is included via WickedEngine, need it for CreateDirectoryA, DeleteFileA
+// Windows.h is included via GrymEngine, need it for CreateDirectoryA, DeleteFileA
 #include <Windows.h>
 
 // For stbi_load to load PNG files (stb_image_write is in wiHelper.cpp)
