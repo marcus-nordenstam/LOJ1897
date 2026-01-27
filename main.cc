@@ -467,6 +467,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     noesisRenderPath.setFXAAEnabled(true);   // FXAA (Editor: true)
     wi::renderer::SetDDGIEnabled(true);      // Enable Dynamic Diffuse Global Illumination
 
+    // Tonemap settings
+    noesisRenderPath.setExposure(0.1f);
+    noesisRenderPath.setTonemap(wi::renderer::Tonemap::ACES); // Default tonemap in Editor
+
+    // Eye adaption settings (Editor eye_adaption_key = 0.1, eye_adaption_rate = 0.5)
+    noesisRenderPath.setEyeAdaptionEnabled(true);
+    noesisRenderPath.setEyeAdaptionKey(0.1f);
+    noesisRenderPath.setEyeAdaptionRate(0.5f);
+
+    // Motion blur settings (Editor: motion_blur = false, motion_blur_strength = 100)
+    noesisRenderPath.setMotionBlurEnabled(true);
+    noesisRenderPath.setMotionBlurStrength(300.0f);
+
     // Initialize application (starts async shader compilation, sets up systems)
     // This must be called before refresh_material_library, same as Editor
     application.Initialize();
