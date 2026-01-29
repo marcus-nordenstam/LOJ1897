@@ -121,6 +121,7 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CM
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${GRYM_ENGINE_DIR}
+        ${GRYM_ROOT_DIR}
         ${NOESISGUI_INCLUDE_DIR}
         ${NOESISGUI_ROOT_DIR}/Src/Packages/Render/D3D12RenderDevice/Include
         ${NOESISGUI_ROOT_DIR}/Src/Packages/Render/D3D12RenderContext/Src

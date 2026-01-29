@@ -1,5 +1,6 @@
 #include "GameStartup.h"
 
+#include "common/grProjectInit.h"
 #include <Systems/animation_system.h>
 #include <Systems/character_system.h>
 #include <wiPhysics.h>
@@ -73,16 +74,14 @@ void GameStartup::SaveConfig() {
     std::ofstream configFile(configPath);
     if (configFile.is_open()) {
         configFile << "# LOJ1897 Configuration File\n";
-        configFile << "# This file is read by both wi::Config (for project initialization)\n";
-        configFile << "# and by the game for LOJ-specific settings\n\n";
+        configFile << "# Library paths are stored in wiProject.ini in the project directory\n\n";
 
-        // Project path - used by wi::Config for project initialization
+        // LOJ1897 section with project path
+        configFile << "[LOJ1897]\n";
         configFile << "project_path = " << GetProjectPath() << "\n\n";
 
         // LOJ-game specific settings
-        configFile << "# Game-specific settings\n";
-        configFile << "anim_lib = " << wi::Project::ptr()->anim_library_path << "\n";
-        configFile << "expression_path = " << wi::Project::ptr()->expression_library_path << "\n";
+        configFile << "[game]\n";
         configFile << "theme_music = " << themeMusic << "\n";
         configFile << "level = " << levelPath << "\n";
         configFile << "player_model = " << playerModel << "\n";
@@ -106,9 +105,13 @@ void GameStartup::LoadConfig() {
         return;
     }
 
-    // First, initialize the project using wi::Config
-    wi::Project::ptr()->InitializeFromConfig(config);
-    wi::backlog::post("Initialized project from config.ini using wi::Config\n");
+    // Initialize the project using the split config pattern
+    std::string projectPath;
+    if (!grym::InitializeProjectFromSplitConfig(config, "LOJ1897", projectPath)) {
+        wi::backlog::post("ERROR: Failed to initialize project from split config\n");
+        UpdateControlStates();
+        return;
+    }
 
     // Now read LOJ-game specific settings from the config
     if (config.HasSection("game")) {
@@ -130,7 +133,7 @@ void GameStartup::LoadConfig() {
 
 void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
     // Load animation library
-    const auto animLib = GetProjectPath() + wi::Project::ptr()->anim_library_path;
+    const std::string animLib = wi::Project::ptr()->animation_library_full_path();
     if (!animLib.empty()) {
         char buffer[512];
         sprintf_s(buffer, "Loading animation library: %s\n", animLib.c_str());
@@ -174,7 +177,7 @@ void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
     }
 
     // Load expressions
-    const auto expressionPath = wi::Project::ptr()->expression_library_path;
+    const std::string expressionPath = wi::Project::ptr()->expression_library_full_path();
     if (!expressionPath.empty()) {
         char buffer[512];
         sprintf_s(buffer, "Loading expressions from: %s\n", expressionPath.c_str());
