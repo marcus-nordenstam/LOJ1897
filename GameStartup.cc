@@ -140,33 +140,20 @@ void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
         wi::backlog::post(buffer);
 
         if (wi::helper::FileExists(animLib)) {
-            wi::scene::Scene animScene;
-            wi::Archive archive(animLib);
-            archive.SetSourceDirectory(wi::helper::InferProjectPath(animLib));
-            if (archive.IsOpen()) {
-                animScene.Serialize(archive);
-
-                animationLibrary.clear();
-                for (size_t a = 0; a < animScene.animations.GetCount(); ++a) {
-                    wi::ecs::Entity anim_entity = animScene.animations.GetEntity(a);
-                    animationLibrary.push_back(anim_entity);
-
-                    const wi::scene::NameComponent *anim_name =
-                        animScene.names.GetComponent(anim_entity);
-                    sprintf_s(buffer, "Found animation '%s' (entity: %llu)\n",
-                              anim_name ? anim_name->name.c_str() : "unnamed", anim_entity);
+            // Animation library is now loaded automatically by Project
+            // Just trigger the load to make sure it's up to date
+            int count = wi::Project::ptr()->LoadAnimationLibrary();
+            
+            sprintf_s(buffer, "Animation library loaded with %d animations\n", count);
+            wi::backlog::post(buffer);
+            
+            // List all loaded animations
+            for (size_t i = 0; i < wi::Project::ptr()->GetAnimationCount(); ++i) {
+                const wi::scene::Animation *anim = wi::Project::ptr()->GetAnimation(static_cast<wi::scene::AnimationIndex>(i));
+                if (anim != nullptr) {
+                    sprintf_s(buffer, "Found animation '%s'\n", anim->name.c_str());
                     wi::backlog::post(buffer);
                 }
-
-                scene.Merge(animScene);
-
-                sprintf_s(buffer, "Animation library loaded with %d animations\n",
-                          (int)animationLibrary.size());
-                wi::backlog::post(buffer);
-            } else {
-                sprintf_s(buffer, "ERROR: Failed to open animation library archive: %s\n",
-                          animLib.c_str());
-                wi::backlog::post(buffer);
             }
         } else {
             sprintf_s(buffer, "ERROR: Animation library not found: %s\n", animLib.c_str());
@@ -182,7 +169,7 @@ void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
         char buffer[512];
         sprintf_s(buffer, "Loading expressions from: %s\n", expressionPath.c_str());
         wi::backlog::post(buffer);
-        scene.LoadExpressions(expressionPath, GetProjectPath());
+        scene.LoadExpressions();
         wi::backlog::post("Expressions loaded successfully\n");
     } else {
         wi::backlog::post("No expression path (expression_path) configured in config.ini\n");
@@ -271,19 +258,25 @@ void GameStartup::StopMenuMusic() {
     }
 }
 
-wi::ecs::Entity GameStartup::FindAnimationByName(const wi::scene::Scene &scene,
-                                                 const char *anim_name_substr) {
-    for (wi::ecs::Entity lib_anim : animationLibrary) {
-        const wi::scene::NameComponent *anim_name = scene.names.GetComponent(lib_anim);
-        if (anim_name) {
-            std::string name_lower = anim_name->name;
+wi::scene::AnimationIndex GameStartup::FindAnimationByName(const char *anim_name_substr) {
+    auto *project = wi::Project::ptr();
+    if (project == nullptr)
+        return wi::scene::INVALID_ANIMATION_INDEX;
+    
+    std::string search_lower = anim_name_substr;
+    std::transform(search_lower.begin(), search_lower.end(), search_lower.begin(), ::tolower);
+    
+    for (size_t i = 0; i < project->GetAnimationCount(); ++i) {
+        const wi::scene::Animation *anim = project->GetAnimation(static_cast<wi::scene::AnimationIndex>(i));
+        if (anim != nullptr) {
+            std::string name_lower = anim->name;
             std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
-            if (name_lower.find(anim_name_substr) != std::string::npos) {
-                return lib_anim;
+            if (name_lower.find(search_lower) != std::string::npos) {
+                return static_cast<wi::scene::AnimationIndex>(i);
             }
         }
     }
-    return wi::ecs::INVALID_ENTITY;
+    return wi::scene::INVALID_ANIMATION_INDEX;
 }
 
 void GameStartup::SpawnCharactersFromMetadata(wi::scene::Scene &scene) {
@@ -428,23 +421,23 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
         npcEntities.push_back(characterEntity);
     }
 
-    // Retarget animations
-    if (modelRoot != wi::ecs::INVALID_ENTITY && !animationLibrary.empty()) {
-        wi::ecs::Entity idle_anim = FindAnimationByName(scene, "idle");
-        wi::ecs::Entity walk_anim = FindAnimationByName(scene, "walk");
-        wi::ecs::Entity sit_anim = FindAnimationByName(scene, "sit");
+    // Retarget animations from library
+    if (modelRoot != wi::ecs::INVALID_ENTITY) {
+        wi::scene::AnimationIndex idle_anim = FindAnimationByName("idle");
+        wi::scene::AnimationIndex walk_anim = FindAnimationByName("walk");
+        wi::scene::AnimationIndex sit_anim = FindAnimationByName("sit");
 
-        if (idle_anim != wi::ecs::INVALID_ENTITY) {
+        if (idle_anim != wi::scene::INVALID_ANIMATION_INDEX) {
             character.action_anim_entities[(int)wi::scene::ActionVerb::Idle] =
                 wi::scene::animation_system::retarget(scene, idle_anim, modelRoot);
         }
-        if (walk_anim != wi::ecs::INVALID_ENTITY) {
+        if (walk_anim != wi::scene::INVALID_ANIMATION_INDEX) {
             character.action_anim_entities[(int)wi::scene::ActionVerb::Walk] =
                 wi::scene::animation_system::retarget(scene, walk_anim, modelRoot);
             character.action_anim_entities[(int)wi::scene::ActionVerb::WalkTo] =
                 character.action_anim_entities[(int)wi::scene::ActionVerb::Walk];
         }
-        if (sit_anim != wi::ecs::INVALID_ENTITY) {
+        if (sit_anim != wi::scene::INVALID_ANIMATION_INDEX) {
             character.action_anim_entities[(int)wi::scene::ActionVerb::Sit] =
                 wi::scene::animation_system::retarget(scene, sit_anim, modelRoot);
             character.action_anim_entities[(int)wi::scene::ActionVerb::Stand] =

@@ -157,6 +157,10 @@ if (MSVC)
 
     # Use faster linker
     add_link_options(/DEBUG:FASTLINK)
+
+    # Enable /bigobj for large object files (needed for heavy template usage from GrymEngine, NoesisGUI, etc.)
+    # Use target_compile_options to apply to the already-created target
+    target_compile_options(${PROJECT_NAME} PRIVATE /bigobj)
 endif ()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

@@ -39,9 +39,8 @@ class GameStartup {
     void StopMenuMusic();
     bool IsMusicPlaying() const { return menuMusicInstance.IsValid(); }
 
-    // Helper to find animation entity by name substring
-    wi::ecs::Entity FindAnimationByName(const wi::scene::Scene &scene,
-                                        const char *anim_name_substr);
+    // Helper to find animation by name substring in the library
+    wi::scene::AnimationIndex FindAnimationByName(const char *anim_name_substr);
 
     // Spawn characters from scene metadata
     void SpawnCharactersFromMetadata(wi::scene::Scene &scene);
@@ -95,9 +94,6 @@ class GameStartup {
     std::string levelPath;
     std::string playerModel;
     std::string npcModel;
-
-    // Animation library entities
-    std::vector<wi::ecs::Entity> animationLibrary;
 
     // Music playback
     wi::audio::Sound menuMusic;
