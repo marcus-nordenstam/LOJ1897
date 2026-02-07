@@ -391,6 +391,7 @@ void NoesisRenderPath::Update(float dt) {
             bool sPressed = (GetAsyncKeyState('S') & 0x8000) != 0;
             bool aPressed = (GetAsyncKeyState('A') & 0x8000) != 0;
             bool dPressed = (GetAsyncKeyState('D') & 0x8000) != 0;
+            bool shiftPressed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
 
             if (wPressed || sPressed || aPressed || dPressed) {
                 if (playerChar->IsGrounded() || playerChar->IsWallIntersect()) {
@@ -420,11 +421,27 @@ void NoesisRenderPath::Update(float dt) {
                     }
                     move_dir.y = 0.0f;
 
-                    auto action =
-                        wi::scene::character_system::make_walk(scene, *playerChar, move_dir);
-                    playerChar->SetAction(scene, action);
+                    // Use run action if SHIFT+W is pressed, otherwise use walk
+                    if (shiftPressed && wPressed && !sPressed) {
+                        if (!playerChar->IsRunning()) {
+                            auto action = wi::scene::character_system::make_run(scene, *playerChar, move_dir);
+                            playerChar->SetAction(scene, action);
+                        } else {
+                            // Already running - just update direction
+                            playerChar->curActions[(int)wi::scene::ActionMotor::Body].direction = move_dir;
+                        }
+                    } else {
+                        if (!playerChar->IsWalking()) {
+                            auto action =
+                                wi::scene::character_system::make_walk(scene, *playerChar, move_dir);
+                            playerChar->SetAction(scene, action);
+                        } else {
+                            // Already walking - just update direction
+                            playerChar->curActions[(int)wi::scene::ActionMotor::Body].direction = move_dir;
+                        }
+                    }
                 }
-            } else if (playerChar->IsWalking()) {
+            } else if (playerChar->IsWalking() || playerChar->IsRunning()) {
                 auto action = wi::scene::character_system::make_idle(scene, *playerChar);
                 playerChar->SetAction(scene, action);
             }
@@ -488,9 +505,10 @@ void NoesisRenderPath::Update(float dt) {
             XMFLOAT4 pointer = wi::input::GetPointer();
             cameraDistance = std::max(0.5f, cameraDistance - pointer.z * 0.3f);
 
-            // === WALK ===
+            // === WALK/RUN ===
             bool wPressed = (GetAsyncKeyState('W') & 0x8000) != 0;
             bool sPressed = (GetAsyncKeyState('S') & 0x8000) != 0;
+            bool shiftPressed = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
 
             if (wPressed || sPressed) {
                 if (playerChar->IsGrounded() || playerChar->IsWallIntersect()) {
@@ -505,11 +523,27 @@ void NoesisRenderPath::Update(float dt) {
                         walk_dir.z = cosf(cameraHorizontal);
                     }
 
-                    auto action =
-                        wi::scene::character_system::make_walk(scene, *playerChar, walk_dir);
-                    playerChar->SetAction(scene, action);
+                    // Use run action if SHIFT+W is pressed, otherwise use walk
+                    if (shiftPressed && wPressed && !sPressed) {
+                        if (!playerChar->IsRunning()) {
+                            auto action = wi::scene::character_system::make_run(scene, *playerChar, walk_dir);
+                            playerChar->SetAction(scene, action);
+                        } else {
+                            // Already running - just update direction
+                            playerChar->curActions[(int)wi::scene::ActionMotor::Body].direction = walk_dir;
+                        }
+                    } else {
+                        if (!playerChar->IsWalking()) {
+                            auto action =
+                                wi::scene::character_system::make_walk(scene, *playerChar, walk_dir);
+                            playerChar->SetAction(scene, action);
+                        } else {
+                            // Already walking - just update direction
+                            playerChar->curActions[(int)wi::scene::ActionMotor::Body].direction = walk_dir;
+                        }
+                    }
                 }
-            } else if (playerChar->IsWalking()) {
+            } else if (playerChar->IsWalking() || playerChar->IsRunning()) {
                 auto action = wi::scene::character_system::make_idle(scene, *playerChar);
                 playerChar->SetAction(scene, action);
             }

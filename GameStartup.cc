@@ -258,27 +258,6 @@ void GameStartup::StopMenuMusic() {
     }
 }
 
-wi::scene::AnimationIndex GameStartup::FindAnimationByName(const char *anim_name_substr) {
-    auto *project = wi::Project::ptr();
-    if (project == nullptr)
-        return wi::scene::INVALID_ANIMATION_INDEX;
-    
-    std::string search_lower = anim_name_substr;
-    std::transform(search_lower.begin(), search_lower.end(), search_lower.begin(), ::tolower);
-    
-    for (size_t i = 0; i < project->GetAnimationCount(); ++i) {
-        const wi::scene::Animation *anim = project->GetAnimation(static_cast<wi::scene::AnimationIndex>(i));
-        if (anim != nullptr) {
-            std::string name_lower = anim->name;
-            std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(), ::tolower);
-            if (name_lower.find(search_lower) != std::string::npos) {
-                return static_cast<wi::scene::AnimationIndex>(i);
-            }
-        }
-    }
-    return wi::scene::INVALID_ANIMATION_INDEX;
-}
-
 void GameStartup::SpawnCharactersFromMetadata(wi::scene::Scene &scene) {
     char buffer[512];
 
@@ -374,6 +353,15 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
     scene.Merge(tempScene);
     scene.ResetPose(modelRoot);
 
+    // Ensure lookAt is disabled for all game characters (player and NPCs)
+    // regardless of what the loaded model has
+    if (humanoidEntity != wi::ecs::INVALID_ENTITY) {
+        wi::scene::HumanoidComponent *humanoid = scene.cc_humanoids.GetComponent(humanoidEntity);
+        if (humanoid != nullptr) {
+            humanoid->SetLookAtEnabled(false);
+        }
+    }
+
     wi::ecs::Entity characterEntity = modelRoot;
 
     wi::scene::CharacterComponent &character = scene.characters.Create(characterEntity);
@@ -421,29 +409,46 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
         npcEntities.push_back(characterEntity);
     }
 
-    // Retarget animations from library
-    if (modelRoot != wi::ecs::INVALID_ENTITY) {
-        wi::scene::AnimationIndex idle_anim = FindAnimationByName("idle");
-        wi::scene::AnimationIndex walk_anim = FindAnimationByName("walk");
-        wi::scene::AnimationIndex sit_anim = FindAnimationByName("sit");
+    // Store animation library indices for character
+    if (modelRoot != wi::ecs::INVALID_ENTITY && humanoidEntity != wi::ecs::INVALID_ENTITY) {
+        // Store humanoid entity reference for animation playback component
+        character.humanoidEntity = humanoidEntity;
+        
+        // Determine character gender from model path (simplified: check for "fem")
+        std::string modelPathLower = modelPath;
+        std::transform(modelPathLower.begin(), modelPathLower.end(), modelPathLower.begin(), ::tolower);
+        bool isFemale = (modelPathLower.find("fem") != std::string::npos);
+        
+        auto *project = wi::Project::ptr();
+        if (project != nullptr) {
+            // Find gender-appropriate animations
+            if (isFemale) {
+                character.action_anim_indices[(int)wi::scene::ActionVerb::Idle] =
+                    project->FindAnimationBySubstrings({"_fem", "idle", "01"});
+                character.action_anim_indices[(int)wi::scene::ActionVerb::Walk] =
+                    project->FindAnimationBySubstrings({"_fem", "walk", "normal"});
+                character.action_anim_indices[(int)wi::scene::ActionVerb::Run] =
+                    project->FindAnimationBySubstrings({"_fem", "run"});
+            } else {
+                character.action_anim_indices[(int)wi::scene::ActionVerb::Idle] =
+                    project->FindAnimationBySubstrings({"_male", "idle", "02"});
+                character.action_anim_indices[(int)wi::scene::ActionVerb::Walk] =
+                    project->FindAnimationBySubstrings({"_male", "walk", "normal"});
+                character.action_anim_indices[(int)wi::scene::ActionVerb::Run] =
+                    project->FindAnimationBySubstrings({"_male", "run"});
+            }
+            
+            // Gender-neutral animations
+            wi::scene::AnimationIndex sit_anim = project->FindAnimationBySubstrings({"sit"});
+            character.action_anim_indices[(int)wi::scene::ActionVerb::Sit] = sit_anim;
+            character.action_anim_indices[(int)wi::scene::ActionVerb::Stand] = sit_anim;
+            
+            // WalkTo uses same animation as Walk
+            character.action_anim_indices[(int)wi::scene::ActionVerb::WalkTo] =
+                character.action_anim_indices[(int)wi::scene::ActionVerb::Walk];
+        }
 
-        if (idle_anim != wi::scene::INVALID_ANIMATION_INDEX) {
-            character.action_anim_entities[(int)wi::scene::ActionVerb::Idle] =
-                wi::scene::animation_system::retarget(scene, idle_anim, modelRoot);
-        }
-        if (walk_anim != wi::scene::INVALID_ANIMATION_INDEX) {
-            character.action_anim_entities[(int)wi::scene::ActionVerb::Walk] =
-                wi::scene::animation_system::retarget(scene, walk_anim, modelRoot);
-            character.action_anim_entities[(int)wi::scene::ActionVerb::WalkTo] =
-                character.action_anim_entities[(int)wi::scene::ActionVerb::Walk];
-        }
-        if (sit_anim != wi::scene::INVALID_ANIMATION_INDEX) {
-            character.action_anim_entities[(int)wi::scene::ActionVerb::Sit] =
-                wi::scene::animation_system::retarget(scene, sit_anim, modelRoot);
-            character.action_anim_entities[(int)wi::scene::ActionVerb::Stand] =
-                character.action_anim_entities[(int)wi::scene::ActionVerb::Sit];
-        }
-
+        // Set initial action (animations will be retargeted on-demand by character system)
         character.SetAction(scene, wi::scene::character_system::make_idle(scene, character));
     }
 
