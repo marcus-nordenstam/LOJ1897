@@ -586,6 +586,66 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
 
         wi::backlog::post("Scene loaded successfully\n");
 
+        // DEBUG: Dump weather entities, their children (sun/moon lights), and all directional lights
+        {
+            sprintf_s(buffer, "[Sky DEBUG] Weather count: %zu\n", scene.weathers.GetCount());
+            wi::backlog::post(buffer);
+            for (size_t i = 0; i < scene.weathers.GetCount(); ++i) {
+                wi::ecs::Entity weatherEntity = scene.weathers.GetEntity(i);
+                wi::scene::NameComponent *weatherName = scene.names.GetComponent(weatherEntity);
+                sprintf_s(buffer, "[Sky DEBUG] Weather[%zu] entity=%u name='%s'\n",
+                          i, (unsigned)weatherEntity,
+                          weatherName ? weatherName->name.c_str() : "<unnamed>");
+                wi::backlog::post(buffer);
+
+                // List children of this weather entity
+                wi::vector<wi::ecs::Entity> children;
+                scene.GatherChildren(weatherEntity, children);
+                sprintf_s(buffer, "[Sky DEBUG]   Children count: %zu\n", children.size());
+                wi::backlog::post(buffer);
+                for (size_t c = 0; c < children.size(); ++c) {
+                    wi::ecs::Entity child = children[c];
+                    wi::scene::NameComponent *childName = scene.names.GetComponent(child);
+                    wi::scene::LightComponent *childLight = scene.lights.GetComponent(child);
+                    sprintf_s(buffer, "[Sky DEBUG]   Child[%zu] entity=%u name='%s' hasLight=%s type=%s intensity=%.2f\n",
+                              c, (unsigned)child,
+                              childName ? childName->name.c_str() : "<unnamed>",
+                              childLight ? "YES" : "no",
+                              childLight ? (childLight->type == wi::scene::LightComponent::DIRECTIONAL ? "DIRECTIONAL" :
+                                           childLight->type == wi::scene::LightComponent::POINT ? "POINT" : "SPOT") : "n/a",
+                              childLight ? childLight->intensity : 0.0f);
+                    wi::backlog::post(buffer);
+                }
+            }
+
+            // Also dump ALL directional lights in the scene
+            sprintf_s(buffer, "[Sky DEBUG] Total lights in scene: %zu\n", scene.lights.GetCount());
+            wi::backlog::post(buffer);
+            size_t dirCount = 0;
+            for (size_t i = 0; i < scene.lights.GetCount(); ++i) {
+                const wi::scene::LightComponent &light = scene.lights[i];
+                if (light.type == wi::scene::LightComponent::DIRECTIONAL) {
+                    wi::ecs::Entity lightEntity = scene.lights.GetEntity(i);
+                    wi::scene::NameComponent *lightName = scene.names.GetComponent(lightEntity);
+                    wi::scene::HierarchyComponent *hier = scene.hierarchy.GetComponent(lightEntity);
+                    wi::ecs::Entity parentEntity = hier ? hier->parentID : wi::ecs::INVALID_ENTITY;
+                    wi::scene::NameComponent *parentName = parentEntity != wi::ecs::INVALID_ENTITY ?
+                        scene.names.GetComponent(parentEntity) : nullptr;
+                    sprintf_s(buffer, "[Sky DEBUG] DirectionalLight[%zu] entity=%u name='%s' intensity=%.2f color=(%.2f,%.2f,%.2f) parent=%u parentName='%s'\n",
+                              dirCount, (unsigned)lightEntity,
+                              lightName ? lightName->name.c_str() : "<unnamed>",
+                              light.intensity,
+                              light.color.x, light.color.y, light.color.z,
+                              (unsigned)parentEntity,
+                              parentName ? parentName->name.c_str() : "<unnamed>");
+                    wi::backlog::post(buffer);
+                    dirCount++;
+                }
+            }
+            sprintf_s(buffer, "[Sky DEBUG] Total directional lights: %zu\n", dirCount);
+            wi::backlog::post(buffer);
+        }
+
         // Wait for resource loading jobs to complete
         wi::jobsystem::Wait(wi::jobsystem::context());
 
@@ -633,6 +693,21 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
 
         // First update with dt=0 to initialize non-terrain systems
         scene.Update(0.0f);
+
+        // DEBUG: Check what the weather system resolved after first Update
+        {
+            sprintf_s(buffer, "[Sky DEBUG] After Update(0): weather.most_important_light_index=%u moon_light_index=%u\n",
+                      scene.weather.most_important_light_index, scene.weather.moon_light_index);
+            wi::backlog::post(buffer);
+            sprintf_s(buffer, "[Sky DEBUG] sunColor=(%.3f,%.3f,%.3f) sunDir=(%.3f,%.3f,%.3f)\n",
+                      scene.weather.sunColor.x, scene.weather.sunColor.y, scene.weather.sunColor.z,
+                      scene.weather.sunDirection.x, scene.weather.sunDirection.y, scene.weather.sunDirection.z);
+            wi::backlog::post(buffer);
+            sprintf_s(buffer, "[Sky DEBUG] moonColor=(%.3f,%.3f,%.3f) moonDir=(%.3f,%.3f,%.3f)\n",
+                      scene.weather.moonColor.x, scene.weather.moonColor.y, scene.weather.moonColor.z,
+                      scene.weather.moonDirection.x, scene.weather.moonDirection.y, scene.weather.moonDirection.z);
+            wi::backlog::post(buffer);
+        }
 
         // CRITICAL: Update with small positive dt to trigger terrain generation!
         // Terrain Generation_Update only runs when dt > 0
