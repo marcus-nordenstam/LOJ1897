@@ -131,13 +131,13 @@ bool MerlinLua::Initialize(const std::string& merlin_path) {
     return true;
 }
 
-void MerlinLua::CreateNpcs() {
+void MerlinLua::CreateNpcs(const std::vector<XMFLOAT3>& spawnPoints) {
     if (!L) {
         wi::backlog::post("ERROR: Cannot create NPCs - Merlin Lua not initialized\n");
         return;
     }
     
-    // Call merlinCreateNpcs() to create the 4 root NPCs
+    // Call merlinCreateNpcs() with spawn points
     lua_getglobal(L, "merlinCreateNpcs");
     if (!lua_isfunction(L, -1)) {
         char buffer[512];
@@ -148,14 +148,40 @@ void MerlinLua::CreateNpcs() {
         return;
     }
     
-    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+    // Push spawn points table to Lua (positions in meters)
+    lua_newtable(L);
+    for (size_t i = 0; i < spawnPoints.size(); i++) {
+        lua_pushinteger(L, i + 1); // Lua uses 1-based indexing
+        lua_newtable(L);
+        
+        // Push x, y, z (in meters)
+        lua_pushstring(L, "x");
+        lua_pushnumber(L, spawnPoints[i].x);
+        lua_settable(L, -3);
+        
+        lua_pushstring(L, "y");
+        lua_pushnumber(L, spawnPoints[i].y);
+        lua_settable(L, -3);
+        
+        lua_pushstring(L, "z");
+        lua_pushnumber(L, spawnPoints[i].z);
+        lua_settable(L, -3);
+        
+        lua_settable(L, -3);
+    }
+    
+    char buffer[512];
+    sprintf_s(buffer, "Creating Merlin NPCs at %zu spawn points\n", spawnPoints.size());
+    wi::backlog::post(buffer);
+    
+    if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
         const char* error_msg = lua_tostring(L, -1);
-        char buffer[512];
         sprintf_s(buffer, "ERROR: merlinCreateNpcs() failed: %s\n", error_msg ? error_msg : "unknown error");
         wi::backlog::post(buffer);
         lua_pop(L, 1);
     } else {
-        wi::backlog::post("Merlin NPCs created successfully\n");
+        sprintf_s(buffer, "Merlin NPCs created successfully at %zu spawn points\n", spawnPoints.size());
+        wi::backlog::post(buffer);
     }
 }
 

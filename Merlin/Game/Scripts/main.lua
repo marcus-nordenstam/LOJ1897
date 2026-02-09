@@ -24,9 +24,13 @@ function merlinInit()
     initMerlin(projectPath, commonPath)
 end
 
-function merlinCreateNpcs()
-    -- Create the 4 root NPCs (called after player character is created)
-    createRootNpcs()
+function merlinCreateNpcs(spawnPoints)
+    -- Create NPCs at spawn points from scene metadata
+    -- spawnPoints: table of {x, y, z} positions in meters
+    if spawnPoints == nil then
+        spawnPoints = {}
+    end
+    createRootNpcs(spawnPoints)
 end
 
 function merlinUpdate(dt)

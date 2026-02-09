@@ -26,10 +26,10 @@ function loadScene()
     }
 
     -- Create a world directly from the terrain file
-    -- 100m wide sectors (in cm)
-    mx.makeWorldFromTerrain("Env/island.ter", 10000)
+    -- 100m wide sectors (in meters)
+    mx.makeWorldFromTerrain("Env/island.ter", 100)
     -- Load the scene layout (objects, buildings, spaces, set dressing etc)
-    mxu.loadSceneLayout("Env/layout.dat", kindToSystemTable)
+    --mxu.loadSceneLayout("Env/layout.dat", kindToSystemTable)
 
     -- Gather things that we use in the setup
     spaces = mx.findEntitiesOfKind("space", "space")
@@ -227,7 +227,7 @@ function walkTo(npc, dst)
     -- Compute direction vector toward destination
     local dx, dy, dz = x2 - x1, y2 - y1, z2 - z1
     local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-    if dist < 75 then
+    if dist < 0.75 then  -- 0.75 meters arrival threshold
         resolveNpcOverlaps(npc, 4)
         return msym.t -- Arrived
     end
@@ -236,7 +236,7 @@ function walkTo(npc, dst)
     local nx, ny, nz = dx / dist, dy / dist, dz / dist
 
     -- Speed (tunable)
-    local speed = 100  -- world units per second
+    local speed = 1.0  -- meters per second
 
     -- Compute movement this frame
     local moveDist = speed * dt

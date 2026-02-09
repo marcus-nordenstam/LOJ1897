@@ -293,19 +293,11 @@ void GameStartup::SpawnCharactersFromMetadata(wi::scene::Scene &scene) {
 
             SpawnCharacter(scene, playerModel, spawnPos, spawnForward, true);
         } else if (metadata.preset == wi::scene::MetadataComponent::Preset::NPC) {
-            if (npcModel.empty()) {
-                sprintf_s(buffer,
-                          "NPC spawn found at (%.2f, %.2f, %.2f) but no npc_model configured\n",
-                          spawnPos.x, spawnPos.y, spawnPos.z);
-                wi::backlog::post(buffer);
-                continue;
-            }
-
-            sprintf_s(buffer, "Spawning NPC at (%.2f, %.2f, %.2f)\n", spawnPos.x, spawnPos.y,
-                      spawnPos.z);
+            // NPCs are now spawned after Merlin NPCs are created (see LoadGameScene)
+            // Skip spawning NPCs here to avoid duplicates
+            sprintf_s(buffer, "NPC spawn point found at (%.2f, %.2f, %.2f) - will spawn after Merlin NPCs\n",
+                      spawnPos.x, spawnPos.y, spawnPos.z);
             wi::backlog::post(buffer);
-
-            SpawnCharacter(scene, npcModel, spawnPos, spawnForward, false);
         }
     }
 }
@@ -694,9 +686,43 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
         // Spawn player character from metadata
         SpawnCharactersFromMetadata(scene);
 
+        // Collect NPC spawn points from metadata for Merlin NPCs
+        struct NPCSpawnInfo {
+            XMFLOAT3 position;
+            XMFLOAT3 forward;
+        };
+        std::vector<NPCSpawnInfo> npcSpawnInfos;
+        std::vector<XMFLOAT3> npcSpawnPoints;
+        for (size_t i = 0; i < scene.metadatas.GetCount(); i++) {
+            wi::ecs::Entity entity = scene.metadatas.GetEntity(i);
+            const wi::scene::MetadataComponent &metadata = scene.metadatas[i];
+            
+            if (metadata.preset == wi::scene::MetadataComponent::Preset::NPC) {
+                wi::scene::TransformComponent *spawnTransform = scene.transforms.GetComponent(entity);
+                if (spawnTransform) {
+                    NPCSpawnInfo spawnInfo;
+                    spawnInfo.position = spawnTransform->GetPosition();
+                    spawnInfo.forward = spawnTransform->GetForward();
+                    npcSpawnInfos.push_back(spawnInfo);
+                    npcSpawnPoints.push_back(spawnTransform->GetPosition());
+                }
+            }
+        }
+
         // Create Merlin NPCs after player character is created
         if (merlinLua.IsInitialized() && playerCharacter != wi::ecs::INVALID_ENTITY) {
-            merlinLua.CreateNpcs();
+            merlinLua.CreateNpcs(npcSpawnPoints);
+        }
+
+        // Spawn visual GRYM NPC entities for each Merlin NPC
+        if (!npcModel.empty() && !npcSpawnInfos.empty()) {
+            char buffer[512];
+            sprintf_s(buffer, "Spawning %zu visual NPC entities for Merlin NPCs\n", npcSpawnInfos.size());
+            wi::backlog::post(buffer);
+            
+            for (const auto& spawnInfo : npcSpawnInfos) {
+                SpawnCharacter(scene, npcModel, spawnInfo.position, spawnInfo.forward, false);
+            }
         }
 
         if (!npcEntities.empty()) {

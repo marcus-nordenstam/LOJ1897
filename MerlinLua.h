@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include "GrymEngine.h"
 
 struct lua_State;
 
@@ -13,7 +15,8 @@ public:
     bool Initialize(const std::string& merlin_path);
     
     // Create NPCs (called after player character is created)
-    void CreateNpcs();
+    // spawnPoints: vector of spawn positions (x, y, z in meters, will be converted to cm)
+    void CreateNpcs(const std::vector<XMFLOAT3>& spawnPoints = {});
     
     // Update Merlin simulation each frame
     void Update(float dt);

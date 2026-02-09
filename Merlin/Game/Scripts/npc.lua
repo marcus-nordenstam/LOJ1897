@@ -129,11 +129,11 @@ function createHand(npcSymbol, handKind, birthTime, handBounds)
 end
 
 function giveBirth(mother)
-    -- Bounds are given in cm
+    -- Bounds are given in meters
     local motherPos = mx.worldPos(mother)
-    local npcSpatialBounds = mx.composeBounds(motherPos, mxu.float3(30,100,175), mxu.quat(0,0,0,1))
-    local lhandSpatialBounds = mx.composeBounds(mxu.float3(0,-4,0), mxu.float3(10,10,10), mxu.quat(0,0,0,1))
-    local rhandSpatialBounds = mx.composeBounds(mxu.float3(0,4,0), mxu.float3(10,10,10), mxu.quat(0,0,0,1))
+    local npcSpatialBounds = mx.composeBounds(motherPos, mxu.float3(0.3,1.0,1.75), mxu.quat(0,0,0,1))
+    local lhandSpatialBounds = mx.composeBounds(mxu.float3(0,-0.04,0), mxu.float3(0.1,0.1,0.1), mxu.quat(0,0,0,1))
+    local rhandSpatialBounds = mx.composeBounds(mxu.float3(0,0.04,0), mxu.float3(0.1,0.1,0.1), mxu.quat(0,0,0,1))
     local child = mx.makeRootEntityNow("human_npc", "human", npcSpatialBounds)
     mx.setOccluder(child, false)
     local lhand = createHand(child, "leftHand", mx.seconds(), lhandSpatialBounds)
@@ -207,16 +207,18 @@ function siblingRel(gender)
     end
 end
 
-function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol)
+function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol, spawnPos)
     -- Root NPCs are born around the year 1720
     local birthYear = 1720
     local birthMonth = 3  -- April (0-based), matching sim start
     local birthDay = 0
     local birthTime = mx.makeSeconds(birthYear, birthMonth, birthDay, 6, 0, 0)
-    -- Bounds are given in cm
-    local npcSpatialBounds = mx.composeBounds(mxu.float3(0,0,0), mxu.float3(30,100,175), mxu.quat(0,0,0,1))
-    local lhandSpatialBounds = mx.composeBounds(mxu.float3(0,-4,0), mxu.float3(10,10,10), mxu.quat(0,0,0,1))
-    local rhandSpatialBounds = mx.composeBounds(mxu.float3(0,4,0), mxu.float3(10,10,10), mxu.quat(0,0,0,1))
+    -- Bounds are given in meters
+    -- spawnPos is optional: if provided, use it; otherwise use (0,0,0)
+    local pos = spawnPos or mxu.float3(0,0,0)
+    local npcSpatialBounds = mx.composeBounds(pos, mxu.float3(0.3,1.0,1.75), mxu.quat(0,0,0,1))
+    local lhandSpatialBounds = mx.composeBounds(mxu.float3(0,-0.04,0), mxu.float3(0.1,0.1,0.1), mxu.quat(0,0,0,1))
+    local rhandSpatialBounds = mx.composeBounds(mxu.float3(0,0.04,0), mxu.float3(0.1,0.1,0.1), mxu.quat(0,0,0,1))
     local npc = mx.makeRootEntityAtTime("human_npc", "human", birthTime, npcSpatialBounds)
     mx.setOccluder(npc, false)
 
@@ -247,7 +249,7 @@ function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol)
     -- Pick a name, once we know the nationality (set in the attr-loop above)
     local nameSymbol
     local luaNationality = mxu.toLuaString(nationality)
-    if gender == "female" then
+    if gender == "female" and manSurnameSymbol ~= nil then
         nameSymbol = generateRootNpcWifeNameSymbol(gender, socialClass, luaNationality, manSurnameSymbol)
     else
         nameSymbol = generateRootNpcNameSymbol(gender, socialClass, luaNationality)
@@ -267,46 +269,36 @@ function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol)
     return npc
 end
 
-function createRootNpcs()
-    -- Upper class families (creating 2 couples = 4 NPCs)
-    for i=0,1 do
-        local man = birthRootNpc("male", "upper", {}, "Npc")
-        local wife = birthRootNpc("female", "upper", {}, "Npc", mx.attrSymbol(man, "name"))
-        -- Put them in a theatre - so they can show their kids it later
-        local manObb = mx.worldBounds(mx.attrSymbol(man, "obb"))
-        local wifeObb = mx.worldBounds(mx.attrSymbol(wife, "obb"))
-        local manSize = mxu.float3(manObb.floats[3], manObb.floats[4], manObb.floats[5])
-        local wifeSize = mxu.float3(wifeObb.floats[3], wifeObb.floats[4], wifeObb.floats[5])
-        local unitQuat = mxu.quat(0,0,0,1)
-        local theatre = theatres.buffer[0]
-        local theatrePos = mx.worldPos(theatre)
-        mx.setLocalBoundsAttr(man, "obb", mx.composeBounds(theatrePos, manSize, unitQuat))
-        mx.setLocalBoundsAttr(wife, "obb", mx.composeBounds(theatrePos, wifeSize, unitQuat))
-        mx.allPerceive()
-        -- Pick a home for them - the first manor available
-        local home = manors.buffer[0]
-        mx.removeSymbolByIndex(manors, 0)
-        -- Put them in their home
-        local homePos = mx.worldPos(home)
-        local wifePos = mxu.displace(homePos, 0, 300, 0)
-        mx.setLocalBoundsAttr(man, "obb", mx.composeBounds(homePos, manSize, unitQuat))
-        mx.setLocalBoundsAttr(wife, "obb", mx.composeBounds(wifePos, wifeSize, unitQuat))
-        resolveNpcOverlaps(man, 4)
-        -- Enable them to see each other & the environment
-        mx.allPerceive()
-        -- Make them believe they are married
-        mx.enterMind(man)
-        mx.believe("{@self spouse ?wife}", mxu.makeBindings({"?wife",mx.observe(wife)}))
-        mx.enterMind(wife)
-        mx.believe("{@self spouse ?man}", mxu.makeBindings({"?man",mx.observe(man)}))
-        -- Make the man believe he owns his home
-        local propertyNameSymbol = mx.attrSymbol(home, "name")
-        local ownerNameSymbol = mx.attrSymbol(man, "name")
-        local ownerKindSymbol = mx.hstrSymbol("[k human]")
-        local ownershipDateSymbol =  mx.dateSymbol()
-        local titleDeedWritings = composeTitleDeedWritings(propertyNameSymbol,ownerNameSymbol,ownerKindSymbol,ownershipDateSymbol)
-        mx.enterMind(man)
-        mx.readMsg(titleDeedWritings)
+function createRootNpcs(spawnPoints)
+    -- Create NPCs at spawn points from scene metadata
+    -- spawnPoints: table of {x, y, z} positions in meters
+    if spawnPoints == nil then
+        spawnPoints = {}
     end
+    
+    -- Loop through each spawn point and create a Merlin NPC
+    for i = 1, #spawnPoints do
+        local spawnPoint = spawnPoints[i]
+        local spawnPos = mxu.float3(spawnPoint.x, spawnPoint.y, spawnPoint.z)
+        
+        -- Create a single NPC at this spawn point
+        -- Randomize gender and social class for variety
+        local gender = (math.random() < 0.5) and "male" or "female"
+        local socialClass = (math.random() < 0.5) and "upper" or "common"
+        local npc = birthRootNpc(gender, socialClass, {}, "Npc", nil, spawnPos)
+        
+        -- Get NPC size for positioning
+        local npcObb = mx.worldBounds(mx.attrSymbol(npc, "obb"))
+        local npcSize = mxu.float3(npcObb.floats[3], npcObb.floats[4], npcObb.floats[5])
+        local unitQuat = mxu.quat(0,0,0,1)
+        
+        -- Position NPC at spawn point
+        mx.setLocalBoundsAttr(npc, "obb", mx.composeBounds(spawnPos, npcSize, unitQuat))
+        resolveNpcOverlaps(npc, 4)
+        
+        -- Enable NPC to see the environment
+        mx.allPerceive()
+    end
+    
     mx.enterAbsMind()
 end
