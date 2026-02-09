@@ -63,7 +63,9 @@ function merlinCreatePlayer(x, y, z)
     mx.setOccluder(playerEntity, false)
     
     -- Set basic attributes
-    mx.setSymbolAttr(playerEntity, "name", mx.hstrSymbol("Player"))
+    -- Create a proper name symbol using assembleRandomFullName (like NPCs do)
+    local playerNameSymbol = mx.assembleRandomFullName("human_player", "maleEnglishName", "commonEnglishSurname")
+    mx.setSymbolAttr(playerEntity, "name", playerNameSymbol)
     mx.setSymbolAttr(playerEntity, "gender", mx.hstrSymbol("male"))
     
     print("Player entity created in Merlin environment")

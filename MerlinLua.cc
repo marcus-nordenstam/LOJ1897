@@ -226,14 +226,14 @@ void MerlinLua::UpdatePlayerPosition(const XMFLOAT3 &position) {
 }
 
 void MerlinLua::CreateNpcs(const std::vector<XMFLOAT3> &spawnPoints,
-                           const std::string &npcModelPath,
+                           const std::vector<std::string> &npcModelPaths,
                            const std::vector<XMFLOAT3> &waypointPositions) {
     if (!L) {
         wi::backlog::post("ERROR: Cannot create NPCs - Merlin Lua not initialized\n");
         return;
     }
 
-    // Call merlinCreateNpcs(spawnPoints, npcModelPath, waypoints)
+    // Call merlinCreateNpcs(spawnPoints, npcModelPaths, waypoints)
     lua_getglobal(L, "merlinCreateNpcs");
     if (!lua_isfunction(L, -1)) {
         char buffer[512];
@@ -267,8 +267,13 @@ void MerlinLua::CreateNpcs(const std::vector<XMFLOAT3> &spawnPoints,
         lua_settable(L, -3);
     }
 
-    // Push npcModelPath string
-    lua_pushstring(L, npcModelPath.c_str());
+    // Push npcModelPaths table to Lua
+    lua_newtable(L);
+    for (size_t i = 0; i < npcModelPaths.size(); i++) {
+        lua_pushinteger(L, i + 1); // Lua uses 1-based indexing
+        lua_pushstring(L, npcModelPaths[i].c_str());
+        lua_settable(L, -3);
+    }
 
     // Push waypoints table to Lua (positions in meters)
     lua_newtable(L);
@@ -293,8 +298,8 @@ void MerlinLua::CreateNpcs(const std::vector<XMFLOAT3> &spawnPoints,
     }
 
     char buffer[512];
-    sprintf_s(buffer, "Creating Merlin NPCs at %zu spawn points with model: %s (%zu waypoints)\n",
-              spawnPoints.size(), npcModelPath.c_str(), waypointPositions.size());
+    sprintf_s(buffer, "Creating Merlin NPCs at %zu spawn points with %zu model(s) (%zu waypoints)\n",
+              spawnPoints.size(), npcModelPaths.size(), waypointPositions.size());
     wi::backlog::post(buffer);
 
     if (lua_pcall(L, 3, 0, 0) != LUA_OK) {

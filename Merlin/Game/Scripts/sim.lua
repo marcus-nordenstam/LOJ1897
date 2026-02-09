@@ -10,12 +10,12 @@ end
 
 function initMerlin(projectPath, commonPath)
     -- Control the console output I want to see
-    mx.toggleChannel("mc", "on")
-    mx.toggleChannel("belief", "on")
+    --mx.toggleChannel("mc", "on")
+    --mx.toggleChannel("belief", "on")
     --mx.toggleChannel("end", "on")
     --mx.toggleChannel("eps", "on")
     --mx.toggleChannel("delib", "on")
-    mx.toggleChannel("rule", "on")
+    --mx.toggleChannel("rule", "on")
     --mx.toggleChannel("rc", "on")
     --mx.toggleChannel("action", "on")
     --mx.toggleChannel("natLang", "on")
@@ -28,6 +28,7 @@ function initMerlin(projectPath, commonPath)
     --mx.toggleChannel("parse", "on")
     --mx.toggleChannel("nl", "on")
     --mx.toggleChannel("wme", "on")
+
 
     -- Initialize Merlin
     mx.start(projectPath, commonPath)

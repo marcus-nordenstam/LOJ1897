@@ -46,10 +46,10 @@ class MerlinLua {
 
     // Create NPCs (called after player character is created)
     // spawnPoints: vector of spawn positions (x, y, z in meters)
-    // npcModelPath: path to the NPC model file (e.g. .grs) for GRYM rendering
+    // npcModelPaths: vector of NPC model file paths (e.g. .grs) for GRYM rendering (cycles through for multiple NPCs)
     // waypointPositions: vector of waypoint positions (x, y, z in meters) to inject as knowledge
     void CreateNpcs(const std::vector<XMFLOAT3> &spawnPoints = {},
-                    const std::string &npcModelPath = "",
+                    const std::vector<std::string> &npcModelPaths = {},
                     const std::vector<XMFLOAT3> &waypointPositions = {});
 
     // Get all Merlin NPC states (triggers Lua to fill shared buffer, reads it back)

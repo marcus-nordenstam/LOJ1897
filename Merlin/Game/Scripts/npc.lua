@@ -283,10 +283,13 @@ function injectWaypointKnowledge(npc, waypointEntity, waypointObb)
     -- Create mental representation of the waypoint
     local mwaypoint = mx.observe(waypointEntity)
     
+    -- Get the OBB symbol from the waypoint entity's obb attribute
+    local obbSymbol = mx.attrSymbol(waypointEntity, "obb")
+    
     -- Create bindings for ?waypoint and ?obb variables
     local bindings = mxu.makeBindings({
         "?waypoint", mwaypoint,
-        "?obb", waypointObb
+        "?obb", obbSymbol
     })
     
     -- Inject each pattern from Waypoint.mc
@@ -296,16 +299,16 @@ function injectWaypointKnowledge(npc, waypointEntity, waypointObb)
     mx.enterAbsMind()
 end
 
-function createRootNpcs(spawnPoints, npcModelPath, waypointPositions)
+function createRootNpcs(spawnPoints, npcModelPaths, waypointPositions)
     -- Create NPCs at spawn points from scene metadata
     -- spawnPoints: table of {x, y, z} positions in meters
-    -- npcModelPath: path to NPC model file for GRYM rendering
+    -- npcModelPaths: table of NPC model file paths for GRYM rendering (cycles through for multiple NPCs)
     -- waypointPositions: table of {x, y, z} waypoint positions in meters
     if spawnPoints == nil then
         spawnPoints = {}
     end
-    if npcModelPath == nil then
-        npcModelPath = ""
+    if npcModelPaths == nil then
+        npcModelPaths = {}
     end
     if waypointPositions == nil then
         waypointPositions = {}
@@ -337,11 +340,18 @@ function createRootNpcs(spawnPoints, npcModelPath, waypointPositions)
         local spawnPoint = spawnPoints[i]
         local spawnPos = mxu.float3(spawnPoint.x, spawnPoint.y, spawnPoint.z)
         
+        -- Cycle through model paths (modulo to wrap around)
+        local modelPath = ""
+        if #npcModelPaths > 0 then
+            local modelIndex = ((i - 1) % #npcModelPaths) + 1  -- Lua 1-based indexing
+            modelPath = npcModelPaths[modelIndex]
+        end
+        
         -- Create a single NPC at this spawn point
         -- Randomize gender and social class for variety
         local gender = (math.random() < 0.5) and "male" or "female"
         local socialClass = (math.random() < 0.5) and "upper" or "common"
-        local npc = birthRootNpc(gender, socialClass, {}, "Npc", nil, spawnPos, npcModelPath)
+        local npc = birthRootNpc(gender, socialClass, {}, "Npc", nil, spawnPos, modelPath)
         
         -- Get NPC size for positioning
         local npcObb = mx.worldBounds(mx.attrSymbol(npc, "obb"))
@@ -350,17 +360,18 @@ function createRootNpcs(spawnPoints, npcModelPath, waypointPositions)
         
         -- Position NPC at spawn point
         mx.setLocalBoundsAttr(npc, "obb", mx.composeBounds(spawnPos, npcSize, unitQuat))
-        resolveNpcOverlaps(npc, 4)
+        -- resolveNpcOverlaps disabled: GRYM handles physics/collision for visual NPCs
+        -- resolveNpcOverlaps(npc, 4)
         
         -- Inject waypoint knowledge into this NPC's mind
         for j = 1, #waypointEntities do
             local wp = waypointEntities[j]
             injectWaypointKnowledge(npc, wp.entity, wp.obb)
         end
-        
-        -- Enable NPC to see the environment
-        mx.allPerceive()
     end
+    
+    -- Enable all NPCs to see the environment (call once after all NPCs created)
+    mx.allPerceive()
     
     mx.enterAbsMind()
 end

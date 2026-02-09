@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <chrono>
 #include <fstream>
+#include <sstream>
 #include <unordered_set>
 
 // Include Merlin's shared header for action buffer communication (pure C, no Merlin internals)
@@ -310,48 +311,31 @@ void GameStartup::SpawnCharactersFromMetadata(wi::scene::Scene &scene) {
 wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::string &modelPath,
                                             const XMFLOAT3 &position, const XMFLOAT3 &forward,
                                             bool isPlayer) {
-    std::string fullModelPath = GetProjectPath();
-    if (!fullModelPath.empty() && fullModelPath.back() != '/' && fullModelPath.back() != '\\') {
-        fullModelPath += "\\";
-    }
-    fullModelPath += modelPath;
-
-    for (char &c : fullModelPath) {
-        if (c == '/')
-            c = '\\';
-    }
-
     char buffer[512];
-    sprintf_s(buffer, "Loading character model: %s\n", fullModelPath.c_str());
+    
+    // Use prefab instantiation instead of LoadModel
+    sprintf_s(buffer, "Instantiating character prefab: %s\n", modelPath.c_str());
     wi::backlog::post(buffer);
 
-    if (!wi::helper::FileExists(fullModelPath)) {
-        sprintf_s(buffer, "ERROR: Character model not found: %s\n", fullModelPath.c_str());
-        wi::backlog::post(buffer);
-        return wi::ecs::INVALID_ENTITY;
-    }
-
-    XMMATRIX spawnMatrix = XMMatrixTranslation(position.x, position.y, position.z);
-
-    wi::scene::Scene tempScene;
-    wi::ecs::Entity modelRoot = wi::scene::LoadModel(tempScene, fullModelPath, spawnMatrix, true);
+    std::string projectPath = GetProjectPath();
+    wi::ecs::Entity modelRoot = scene.InstantiateNew(modelPath, projectPath);
 
     if (modelRoot == wi::ecs::INVALID_ENTITY) {
-        sprintf_s(buffer, "ERROR: Failed to load character model: %s\n", fullModelPath.c_str());
+        sprintf_s(buffer, "ERROR: Failed to instantiate character prefab: %s\n", modelPath.c_str());
         wi::backlog::post(buffer);
         return wi::ecs::INVALID_ENTITY;
     }
 
+    // Find humanoid component
     wi::ecs::Entity humanoidEntity = wi::ecs::INVALID_ENTITY;
-    for (size_t h = 0; h < tempScene.cc_humanoids.GetCount(); ++h) {
-        wi::ecs::Entity hEntity = tempScene.cc_humanoids.GetEntity(h);
-        if (hEntity == modelRoot || tempScene.Entity_IsDescendant(hEntity, modelRoot)) {
+    for (size_t h = 0; h < scene.cc_humanoids.GetCount(); ++h) {
+        wi::ecs::Entity hEntity = scene.cc_humanoids.GetEntity(h);
+        if (hEntity == modelRoot || scene.Entity_IsDescendant(hEntity, modelRoot)) {
             humanoidEntity = hEntity;
             break;
         }
     }
 
-    scene.Merge(tempScene);
     scene.ResetPose(modelRoot);
 
     // Ensure lookAt is disabled for all game characters (player and NPCs)
@@ -400,12 +384,8 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
         mind.type = wi::scene::MindComponent::Type::NPC;
         layer->layerMask = 1 << 1;
 
-        bool is_patrol = (rand() % 2) == 0;
-        if (is_patrol) {
-            mind.scriptCallback = "npc_patrol_update";
-        } else {
-            mind.scriptCallback = "npc_guard_update";
-        }
+        // Script callbacks disabled — NPCs are now driven by Merlin action pipeline
+        // mind.scriptCallback is left empty so actions control movement directly
 
         npcEntities.push_back(characterEntity);
     }
@@ -738,7 +718,15 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
         // Create Merlin NPCs after player character is created
         // Visual GRYM entities will be spawned/despawned dynamically via UpdateProximitySpawning
         if (merlinLua.IsInitialized() && playerCharacter != wi::ecs::INVALID_ENTITY) {
-            merlinLua.CreateNpcs(npcSpawnPoints, npcModel, waypointPositions);
+            // Parse npcModel as space-separated list of model paths
+            std::vector<std::string> npcModelPaths;
+            std::istringstream iss(npcModel);
+            std::string modelPath;
+            while (iss >> modelPath) {
+                npcModelPaths.push_back(modelPath);
+            }
+            
+            merlinLua.CreateNpcs(npcSpawnPoints, npcModelPaths, waypointPositions);
 
             // Register waypoint GRYM entities in grym_merlin_entity_table
             // Lua has filled the waypoint buffer with Merlin waypoint entity symbols (in same order
@@ -844,9 +832,35 @@ void GameStartup::UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT
 
                         char buffer[1024];
                         sprintf_s(buffer,
-                                  "Spawned GRYM entity for Merlin NPC %llu at distance %.2fm\n",
-                                  static_cast<unsigned long long>(npcState.merlinId), distance);
+                                  "Spawned GRYM entity %llu for Merlin NPC %llu at (%.2f, %.2f, %.2f) distance %.2fm\n",
+                                  static_cast<unsigned long long>(grymEntity),
+                                  static_cast<unsigned long long>(npcState.merlinId),
+                                  npcPos.x, npcPos.y, npcPos.z, distance);
                         wi::backlog::post(buffer);
+                        
+                        // Check if entity has visual components and layer mask
+                        int objectCount = 0;
+                        for (size_t i = 0; i < scene.objects.GetCount(); i++) {
+                            wi::ecs::Entity ent = scene.objects.GetEntity(i);
+                            if (ent == grymEntity || scene.Entity_IsDescendant(ent, grymEntity)) {
+                                objectCount++;
+                            }
+                        }
+                        
+                        auto* layer = scene.layers.GetComponent(grymEntity);
+                        auto* transform = scene.transforms.GetComponent(grymEntity);
+                        
+                        sprintf_s(buffer, "  Entity %llu: objects=%d layerMask=0x%X\n",
+                                  static_cast<unsigned long long>(grymEntity), objectCount,
+                                  layer ? layer->layerMask : 0);
+                        wi::backlog::post(buffer);
+                        
+                        if (transform) {
+                            XMFLOAT3 pos = transform->GetPosition();
+                            sprintf_s(buffer, "  Transform position: (%.2f, %.2f, %.2f)\n",
+                                      pos.x, pos.y, pos.z);
+                            wi::backlog::post(buffer);
+                        }
                     }
                 }
             } else {
@@ -884,8 +898,10 @@ void GameStartup::UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT
                     grym_merlin_entity_table.erase(it);
 
                     char buffer[256];
-                    sprintf_s(buffer, "Despawned GRYM entity for Merlin NPC %llu (out of range)\n",
-                              static_cast<unsigned long long>(npcState.merlinId));
+                    sprintf_s(buffer, "Despawned GRYM entity %llu for Merlin NPC %llu (out of range for %.1fs)\n",
+                              static_cast<unsigned long long>(grymEntity),
+                              static_cast<unsigned long long>(npcState.merlinId),
+                              it->second.outOfRangeTimer);
                     wi::backlog::post(buffer);
                 }
             }
@@ -922,7 +938,8 @@ void GameStartup::UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT
             grym_merlin_entity_table.erase(it);
 
             char buffer[256];
-            sprintf_s(buffer, "Removed stale GRYM entity for Merlin NPC %llu\n",
+            sprintf_s(buffer, "Removed stale GRYM entity %llu for Merlin NPC %llu (NPC no longer exists)\n",
+                      static_cast<unsigned long long>(grymEntity),
                       static_cast<unsigned long long>(merlinId));
             wi::backlog::post(buffer);
         }
@@ -1016,6 +1033,23 @@ static void HandleWalkTo(wi::scene::Scene &scene, wi::scene::CharacterComponent 
         targetPos = XMFLOAT3(mpos.floats[0], mpos.floats[1], mpos.floats[2]);
     }
 
+    // DEBUG: Check which path we're taking and animation setup
+    static bool debuggedOnce = false;
+    if (!debuggedOnce) {
+        debuggedOnce = true;
+        char buffer[512];
+        sprintf_s(
+            buffer,
+            "[HandleWalkTo] useEntityWalkTo=%d, grymTarget=%llu, targetPos=(%.2f,%.2f,%.2f)\n",
+            useEntityWalkTo, grymTarget, targetPos.x, targetPos.y, targetPos.z);
+        wi::backlog::post(buffer);
+        sprintf_s(buffer, "[HandleWalkTo] NPC humanoid=%llu, Walk anim=%d, WalkTo anim=%d\n",
+                  character.humanoidEntity,
+                  character.action_anim_indices[(int)wi::scene::ActionVerb::Walk],
+                  character.action_anim_indices[(int)wi::scene::ActionVerb::WalkTo]);
+        wi::backlog::post(buffer);
+    }
+
     // Check arrival (same 1.5m threshold GRYM uses in update_walkto_action)
     XMFLOAT3 currentPos = character.GetPositionInterpolated();
     float dx = targetPos.x - currentPos.x;
@@ -1029,17 +1063,27 @@ static void HandleWalkTo(wi::scene::Scene &scene, wi::scene::CharacterComponent 
         return;
     }
 
-    // Set the GRYM action (SetAction deduplicates — safe to call every frame)
+    // Set the GRYM action (similar pattern to player input in NoesisRenderPath)
     if (useEntityWalkTo) {
         // Entity target: use make_walk_to which reads the entity's transform each frame
-        auto action = wi::scene::character_system::make_walk_to(scene, character, grymTarget);
-        character.SetAction(scene, action);
+        if (!character.IsWalking()) {
+            auto action = wi::scene::character_system::make_walk_to(scene, character, grymTarget);
+            character.SetAction(scene, action);
+        } else {
+            // Already walking - make_walk_to updates target automatically, no action needed
+        }
     } else {
         // OBB target: compute direction and use make_walk
         float dist = sqrtf(distSq);
         XMFLOAT3 dir = {dx / dist, 0.0f, dz / dist};
-        auto action = wi::scene::character_system::make_walk(scene, character, dir);
-        character.SetAction(scene, action);
+
+        if (!character.IsWalking()) {
+            auto action = wi::scene::character_system::make_walk(scene, character, dir);
+            character.SetAction(scene, action);
+        } else {
+            // Already walking - just update direction
+            character.curActions[(int)wi::scene::ActionMotor::Body].direction = dir;
+        }
     }
 }
 
