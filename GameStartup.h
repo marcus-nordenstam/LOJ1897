@@ -9,7 +9,14 @@
 
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
+
+// Generic entry for mapping Merlin environment entities to GRYM scene entities
+struct GrymMerlinEntityEntry {
+    wi::ecs::Entity grymEntity = wi::ecs::INVALID_ENTITY;
+    float outOfRangeTimer = 0.0f;  // seconds this entity has been outside spawn range
+};
 
 // Game startup/shutdown system for config, scene loading, characters, NPC scripts, music
 class GameStartup {
@@ -57,6 +64,9 @@ class GameStartup {
 
     // Toggle fullscreen mode
     void ToggleFullscreen(HWND windowHandle);
+    
+    // Proximity-based spawning/despawning of GRYM entities from Merlin environment
+    void UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT3 &playerPos, float dt);
 
     // Getters for state
     const std::string &GetProjectPath() const { return wi::Project::ptr()->path; }
@@ -107,6 +117,11 @@ class GameStartup {
     std::vector<wi::ecs::Entity> npcEntities;
     bool patrolScriptLoaded = false;
     bool guardScriptLoaded = false;
+
+    // Generic bidirectional mapping between Merlin environment entities and GRYM scene entities
+    // Key: Merlin entity ID (string representation of symbol)
+    // Value: GRYM entity and despawn timer
+    std::unordered_map<std::string, GrymMerlinEntityEntry> grym_merlin_entity_table;
 
     // Fullscreen state
     bool isFullscreen = false;

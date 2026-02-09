@@ -321,12 +321,36 @@ void NoesisRenderPath::Stop() {
 }
 
 void NoesisRenderPath::Update(float dt) {
-    RenderPath3D::Update(dt);
-
-    // Update Merlin Lua subsystem only when not in main menu mode
+    // Scene modifications (spawning/despawning) must happen BEFORE RenderPath3D::Update,
+    // because Update kicks off parallel rendering jobs that read scene arrays.
+    // Modifying the scene after that causes out-of-bounds access in visibility/occlusion.
     if (!inMainMenuMode) {
+        wi::ecs::Entity playerCharacter = gameStartup.GetPlayerCharacter();
+        wi::scene::Scene &scene = wi::scene::GetScene();
+        
+        // Update player position in Merlin environment
+        if (playerCharacter != wi::ecs::INVALID_ENTITY) {
+            auto* playerChar = scene.characters.GetComponent(playerCharacter);
+            if (playerChar) {
+                XMFLOAT3 playerPos = playerChar->GetPositionInterpolated();
+                gameStartup.merlinLua.UpdatePlayerPosition(playerPos);
+            }
+        }
+        
         gameStartup.merlinLua.Update(dt);
+        
+        // Update proximity-based spawning/despawning of GRYM entities from Merlin
+        // Uses previous frame's player position (fine for 100m range check)
+        if (playerCharacter != wi::ecs::INVALID_ENTITY) {
+            auto* playerChar = scene.characters.GetComponent(playerCharacter);
+            if (playerChar) {
+                XMFLOAT3 playerPos = playerChar->GetPositionInterpolated();
+                gameStartup.UpdateProximitySpawning(scene, playerPos, dt);
+            }
+        }
     }
+    
+    RenderPath3D::Update(dt);
 
     // Update notification fade-out
     if (notificationTimer > 0.0f) {

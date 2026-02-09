@@ -207,7 +207,7 @@ function siblingRel(gender)
     end
 end
 
-function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol, spawnPos)
+function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol, spawnPos, modelPath)
     -- Root NPCs are born around the year 1720
     local birthYear = 1720
     local birthMonth = 3  -- April (0-based), matching sim start
@@ -216,6 +216,8 @@ function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol, s
     -- Bounds are given in meters
     -- spawnPos is optional: if provided, use it; otherwise use (0,0,0)
     local pos = spawnPos or mxu.float3(0,0,0)
+    -- modelPath is optional: path to GRYM model file for rendering
+    modelPath = modelPath or ""
     local npcSpatialBounds = mx.composeBounds(pos, mxu.float3(0.3,1.0,1.75), mxu.quat(0,0,0,1))
     local lhandSpatialBounds = mx.composeBounds(mxu.float3(0,-0.04,0), mxu.float3(0.1,0.1,0.1), mxu.quat(0,0,0,1))
     local rhandSpatialBounds = mx.composeBounds(mxu.float3(0,0.04,0), mxu.float3(0.1,0.1,0.1), mxu.quat(0,0,0,1))
@@ -255,6 +257,10 @@ function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol, s
         nameSymbol = generateRootNpcNameSymbol(gender, socialClass, luaNationality)
     end
     mx.setSymbolAttr(npc, "name", nameSymbol)
+    -- Store GRYM model path for rendering
+    if modelPath ~= "" then
+        mx.setSymbolAttr(npc, "modelPath", mx.hstrSymbol(modelPath))
+    end
     -- Learn initial knowledge by reading any given documents
     --for _, doc in ipairs(knowledge) do
     --    mx.read(npc, doc, "writings")
@@ -269,11 +275,15 @@ function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol, s
     return npc
 end
 
-function createRootNpcs(spawnPoints)
+function createRootNpcs(spawnPoints, npcModelPath)
     -- Create NPCs at spawn points from scene metadata
     -- spawnPoints: table of {x, y, z} positions in meters
+    -- npcModelPath: path to NPC model file for GRYM rendering
     if spawnPoints == nil then
         spawnPoints = {}
+    end
+    if npcModelPath == nil then
+        npcModelPath = ""
     end
     
     -- Loop through each spawn point and create a Merlin NPC
@@ -285,7 +295,7 @@ function createRootNpcs(spawnPoints)
         -- Randomize gender and social class for variety
         local gender = (math.random() < 0.5) and "male" or "female"
         local socialClass = (math.random() < 0.5) and "upper" or "common"
-        local npc = birthRootNpc(gender, socialClass, {}, "Npc", nil, spawnPos)
+        local npc = birthRootNpc(gender, socialClass, {}, "Npc", nil, spawnPos, npcModelPath)
         
         -- Get NPC size for positioning
         local npcObb = mx.worldBounds(mx.attrSymbol(npc, "obb"))
