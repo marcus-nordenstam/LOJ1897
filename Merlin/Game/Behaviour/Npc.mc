@@ -10,7 +10,6 @@ rule ->
 
 rule go-to-waypoint
 {?waypoint isa [k waypoint]}
-{?waypoint obb ?obb}
     ->
-(maintainProposal {@self go ?obb}).
+(maintainProposal {@self go ?waypoint}).
 

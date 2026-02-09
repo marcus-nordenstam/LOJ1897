@@ -40,6 +40,7 @@ ffi.cdef[[
 -- Cast lightuserdata pointers (set by C++ in MerlinLua::Initialize) to FFI struct pointers
 local npcStateBuf    = ffi.cast("EntitySyncBuffer*", g_npcStateBufferPtr)
 local posFeedbackBuf = ffi.cast("EntitySyncBuffer*", g_posFeedbackBufferPtr)
+waypointBuf          = ffi.cast("EntitySyncBuffer*", g_waypointBufferPtr)
 
 -- Global player entity
 playerEntity = nil

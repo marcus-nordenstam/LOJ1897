@@ -314,6 +314,7 @@ function createRootNpcs(spawnPoints, npcModelPath, waypointPositions)
     -- Create waypoint entities in Merlin environment
     local waypointEntities = {}
     local birthTime = mx.makeSeconds(1720, 3, 0, 6, 0, 0)
+    waypointBuf.count = 0
     for i = 1, #waypointPositions do
         local wpPos = mxu.float3(waypointPositions[i].x, waypointPositions[i].y, waypointPositions[i].z)
         local wpSize = mxu.float3(1.0, 1.0, 1.0)  -- 1m cube
@@ -325,6 +326,10 @@ function createRootNpcs(spawnPoints, npcModelPath, waypointPositions)
         mx.setOccluder(waypoint, false)
         
         table.insert(waypointEntities, {entity = waypoint, obb = wpObb})
+        
+        -- Write waypoint symbol to shared buffer for C++ to read
+        waypointBuf.entries[waypointBuf.count].merlinId = waypoint
+        waypointBuf.count = waypointBuf.count + 1
     end
     
     -- Loop through each spawn point and create a Merlin NPC

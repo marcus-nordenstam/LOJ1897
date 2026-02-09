@@ -116,6 +116,7 @@ set_target_properties(GrymEngine PROPERTIES
 # Create imported target for Merlin (source browsing + debugging)
 # Merlin is loaded at runtime via LuaJIT FFI, not linked directly,
 # but we import it so the IDE can browse its source under External Libraries.
+# CInterface functions are loaded dynamically via GetProcAddress in MerlinLua.
 add_library(MerlinLib INTERFACE IMPORTED)
 set_target_properties(MerlinLib PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${MERLIN_SOURCE_DIR}"

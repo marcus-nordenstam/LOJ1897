@@ -345,7 +345,11 @@ void NoesisRenderPath::Update(float dt) {
         // 3. Run Merlin simulation (with corrected positions from GRYM)
         gameStartup.merlinLua.Update(dt);
         
-        // 4. Proximity-based spawning/despawning of GRYM entities from Merlin
+        // 4. Process Merlin action commands: read filled buffers, dispatch to GRYM handlers
+        //    (fillForeignActionBuffer) executes during Merlin sim, writes to buffers and reads outcomes from previous frame
+        gameStartup.ProcessActionCommands(scene);
+        
+        // 5. Proximity-based spawning/despawning of GRYM entities from Merlin
         if (playerCharacter != wi::ecs::INVALID_ENTITY) {
             auto* playerChar = scene.characters.GetComponent(playerCharacter);
             if (playerChar) {
@@ -355,6 +359,7 @@ void NoesisRenderPath::Update(float dt) {
         }
     }
     
+    // 6. GRYM physics and rendering update (character_system::run updates actions)
     RenderPath3D::Update(dt);
 
     // Update notification fade-out

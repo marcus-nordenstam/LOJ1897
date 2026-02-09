@@ -13,6 +13,14 @@
 #include <fstream>
 #include <unordered_set>
 
+// Include Merlin's shared header for action buffer communication (pure C, no Merlin internals)
+#include "../Merlin/Src/Lib/Interface/C/ForeignActionCommandBuffer.h"
+
+// Forward declaration for action dispatch handler
+static void HandleWalkTo(wi::scene::Scene &scene, wi::scene::CharacterComponent &character,
+                         ForeignActionCommand &cmd,
+                         std::unordered_map<uint64_t, GrymMerlinEntityEntry> &entityTable);
+
 void GameStartup::Initialize(Noesis::Grid *menu, Noesis::TextBox *seed, Noesis::Button *play,
                              Noesis::Button *fullscreen) {
     menuContainer = Noesis::Ptr<Noesis::Grid>(menu);
@@ -685,7 +693,8 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
 
         // Create player entity in Merlin environment
         if (merlinLua.IsInitialized() && playerCharacter != wi::ecs::INVALID_ENTITY) {
-            wi::scene::TransformComponent* playerTransform = scene.transforms.GetComponent(playerCharacter);
+            wi::scene::TransformComponent *playerTransform =
+                scene.transforms.GetComponent(playerCharacter);
             if (playerTransform) {
                 XMFLOAT3 playerPos = playerTransform->GetPosition();
                 merlinLua.CreatePlayer(playerPos);
@@ -700,13 +709,15 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
         std::vector<NPCSpawnInfo> npcSpawnInfos;
         std::vector<XMFLOAT3> npcSpawnPoints;
         std::vector<XMFLOAT3> waypointPositions;
-        
+        std::vector<wi::ecs::Entity> waypointEntities;
+
         for (size_t i = 0; i < scene.metadatas.GetCount(); i++) {
             wi::ecs::Entity entity = scene.metadatas.GetEntity(i);
             const wi::scene::MetadataComponent &metadata = scene.metadatas[i];
-            
+
             if (metadata.preset == wi::scene::MetadataComponent::Preset::NPC) {
-                wi::scene::TransformComponent *spawnTransform = scene.transforms.GetComponent(entity);
+                wi::scene::TransformComponent *spawnTransform =
+                    scene.transforms.GetComponent(entity);
                 if (spawnTransform) {
                     NPCSpawnInfo spawnInfo;
                     spawnInfo.position = spawnTransform->GetPosition();
@@ -715,9 +726,11 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
                     npcSpawnPoints.push_back(spawnTransform->GetPosition());
                 }
             } else if (metadata.preset == wi::scene::MetadataComponent::Preset::Waypoint) {
-                wi::scene::TransformComponent *waypointTransform = scene.transforms.GetComponent(entity);
+                wi::scene::TransformComponent *waypointTransform =
+                    scene.transforms.GetComponent(entity);
                 if (waypointTransform) {
                     waypointPositions.push_back(waypointTransform->GetPosition());
+                    waypointEntities.push_back(entity);
                 }
             }
         }
@@ -726,6 +739,24 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
         // Visual GRYM entities will be spawned/despawned dynamically via UpdateProximitySpawning
         if (merlinLua.IsInitialized() && playerCharacter != wi::ecs::INVALID_ENTITY) {
             merlinLua.CreateNpcs(npcSpawnPoints, npcModel, waypointPositions);
+
+            // Register waypoint GRYM entities in grym_merlin_entity_table
+            // Lua has filled the waypoint buffer with Merlin waypoint entity symbols (in same order
+            // as waypointPositions)
+            std::vector<uint64_t> waypointSymbols = merlinLua.GetWaypointSymbols();
+            if (waypointSymbols.size() != waypointEntities.size()) {
+                wi::backlog::post("[warning] Waypoint count mismatch between GRYM and Merlin\n");
+            }
+            for (size_t i = 0; i < waypointSymbols.size() && i < waypointEntities.size(); i++) {
+                GrymMerlinEntityEntry entry;
+                entry.grymEntity = waypointEntities[i];
+                entry.outOfRangeTimer = 0.0f;
+                entry.actionBuffer = nullptr; // Waypoints don't have action buffers
+                grym_merlin_entity_table[waypointSymbols[i]] = entry;
+            }
+
+            // Initialize action dispatch table
+            actionDispatchTable[merlinLua.QueryHstr("WALK_TO")] = &HandleWalkTo;
         }
 
     } else {
@@ -744,64 +775,76 @@ void GameStartup::FeedbackGrymPositions(wi::scene::Scene &scene) {
     // Feed GRYM physics-resolved positions back to Merlin for all spawned entities.
     // This ensures gravity, collisions, etc. resolved by GRYM are reflected in Merlin.
     merlinLua.BeginPositionFeedback();
-    
+
     for (const auto &[merlinId, entry] : grym_merlin_entity_table) {
-        if (entry.grymEntity == wi::ecs::INVALID_ENTITY) continue;
-        
+        if (entry.grymEntity == wi::ecs::INVALID_ENTITY)
+            continue;
+
         wi::scene::CharacterComponent *character = scene.characters.GetComponent(entry.grymEntity);
         if (character) {
             XMFLOAT3 pos = character->GetPositionInterpolated();
             merlinLua.AddPositionFeedback(merlinId, pos);
         }
     }
-    
+
     merlinLua.ApplyPositionFeedback();
 }
 
-void GameStartup::UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT3 &playerPos, float dt) {
+void GameStartup::UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT3 &playerPos,
+                                          float dt) {
     // Query all Merlin NPC states
     std::vector<NpcState> npcStates = merlinLua.GetNpcStates();
-    
+
     // Track which Merlin NPCs we've seen this frame
     std::unordered_set<uint64_t> activeNpcs;
-    
+
     const float spawnRange = 100.0f;  // meters
-    const float despawnDelay = 10.0f;  // seconds
-    
+    const float despawnDelay = 10.0f; // seconds
+
     for (const auto &npcState : npcStates) {
         activeNpcs.insert(npcState.merlinId);
-        
+
         // Compute distance to player (use Merlin position for proximity check)
         XMFLOAT3 npcPos(npcState.x, npcState.y, npcState.z);
         XMVECTOR playerVec = XMLoadFloat3(&playerPos);
         XMVECTOR npcVec = XMLoadFloat3(&npcPos);
         XMVECTOR distVec = XMVector3Length(npcVec - playerVec);
         float distance = XMVectorGetX(distVec);
-        
+
         // Check if already in table
         auto it = grym_merlin_entity_table.find(npcState.merlinId);
         bool isSpawned = (it != grym_merlin_entity_table.end());
-        
+
         if (distance <= spawnRange) {
             // Within spawn range
             if (!isSpawned) {
                 // Spawn new GRYM entity at Merlin's position (initial placement only)
                 if (!npcState.modelPath.empty()) {
-                    XMFLOAT3 forward(0, 0, 1);  // Default forward direction
-                    wi::ecs::Entity grymEntity = SpawnCharacter(scene, npcState.modelPath, 
-                                                                npcPos, forward, false);
-                    
+                    XMFLOAT3 forward(0, 0, 1); // Default forward direction
+                    wi::ecs::Entity grymEntity =
+                        SpawnCharacter(scene, npcState.modelPath, npcPos, forward, false);
+
                     if (grymEntity != wi::ecs::INVALID_ENTITY) {
                         GrymMerlinEntityEntry entry;
                         entry.grymEntity = grymEntity;
                         entry.outOfRangeTimer = 0.0f;
+
+                        // Allocate action command buffer for this NPC
+                        entry.actionBuffer = new ForeignActionCommandBuffer{};
+                        memset(entry.actionBuffer, 0, sizeof(ForeignActionCommandBuffer));
+
                         grym_merlin_entity_table[npcState.merlinId] = entry;
-                        
+
+                        // Register buffer with Merlin so action rules can write to it
+                        MerlinLua::registerForeignActionCommandBuffer(npcState.merlinId,
+                                                                      entry.actionBuffer);
+
                         // Add to npcEntities tracking vector
                         npcEntities.push_back(grymEntity);
-                        
-                        char buffer[256];
-                        sprintf_s(buffer, "Spawned GRYM entity for Merlin NPC %llu at distance %.2fm\n", 
+
+                        char buffer[1024];
+                        sprintf_s(buffer,
+                                  "Spawned GRYM entity for Merlin NPC %llu at distance %.2fm\n",
                                   static_cast<unsigned long long>(npcState.merlinId), distance);
                         wi::backlog::post(buffer);
                     }
@@ -817,25 +860,31 @@ void GameStartup::UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT
             if (isSpawned) {
                 // Increment out-of-range timer
                 it->second.outOfRangeTimer += dt;
-                
+
                 // Despawn if out of range for too long
                 if (it->second.outOfRangeTimer >= despawnDelay) {
                     wi::ecs::Entity grymEntity = it->second.grymEntity;
-                    
+
+                    // Unregister and delete action buffer
+                    if (it->second.actionBuffer) {
+                        MerlinLua::unregisterForeignActionCommandBuffer(npcState.merlinId);
+                        delete it->second.actionBuffer;
+                    }
+
                     // Remove from scene
                     scene.Entity_Remove(grymEntity, true);
-                    
+
                     // Remove from npcEntities vector
                     auto npcIt = std::find(npcEntities.begin(), npcEntities.end(), grymEntity);
                     if (npcIt != npcEntities.end()) {
                         npcEntities.erase(npcIt);
                     }
-                    
+
                     // Remove from table
                     grym_merlin_entity_table.erase(it);
-                    
+
                     char buffer[256];
-                    sprintf_s(buffer, "Despawned GRYM entity for Merlin NPC %llu (out of range)\n", 
+                    sprintf_s(buffer, "Despawned GRYM entity for Merlin NPC %llu (out of range)\n",
                               static_cast<unsigned long long>(npcState.merlinId));
                     wi::backlog::post(buffer);
                 }
@@ -843,7 +892,7 @@ void GameStartup::UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT
             // If not spawned and out of range: no-op
         }
     }
-    
+
     // Clean up stale entries for Merlin NPCs that no longer exist
     std::vector<uint64_t> toRemove;
     for (const auto &entry : grym_merlin_entity_table) {
@@ -851,22 +900,29 @@ void GameStartup::UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT
             toRemove.push_back(entry.first);
         }
     }
-    
+
     for (uint64_t merlinId : toRemove) {
         auto it = grym_merlin_entity_table.find(merlinId);
         if (it != grym_merlin_entity_table.end()) {
             wi::ecs::Entity grymEntity = it->second.grymEntity;
+
+            // Unregister and delete action buffer
+            if (it->second.actionBuffer) {
+                MerlinLua::unregisterForeignActionCommandBuffer(merlinId);
+                delete it->second.actionBuffer;
+            }
+
             scene.Entity_Remove(grymEntity, true);
-            
+
             auto npcIt = std::find(npcEntities.begin(), npcEntities.end(), grymEntity);
             if (npcIt != npcEntities.end()) {
                 npcEntities.erase(npcIt);
             }
-            
+
             grym_merlin_entity_table.erase(it);
-            
+
             char buffer[256];
-            sprintf_s(buffer, "Removed stale GRYM entity for Merlin NPC %llu\n", 
+            sprintf_s(buffer, "Removed stale GRYM entity for Merlin NPC %llu\n",
                       static_cast<unsigned long long>(merlinId));
             wi::backlog::post(buffer);
         }
@@ -927,5 +983,83 @@ void GameStartup::ShowMenu(bool visible) {
     if (menuContainer) {
         menuContainer->SetVisibility(visible ? Noesis::Visibility_Visible
                                              : Noesis::Visibility_Collapsed);
+    }
+}
+
+// ============================================================================
+// Action Dispatch Handlers
+// ============================================================================
+
+static void HandleWalkTo(wi::scene::Scene &scene, wi::scene::CharacterComponent &character,
+                         ForeignActionCommand &cmd,
+                         std::unordered_map<uint64_t, GrymMerlinEntityEntry> &entityTable) {
+    // Resolve target position — depends on Merlin symbol type
+    XMFLOAT3 targetPos;
+    bool useEntityWalkTo = false;
+    wi::ecs::Entity grymTarget = wi::ecs::INVALID_ENTITY;
+
+    // First, try entity table lookup (works for entities like waypoints, NPCs, etc.)
+    auto it = entityTable.find(cmd.target);
+    if (it != entityTable.end()) {
+        grymTarget = it->second.grymEntity;
+        auto *transform = scene.transforms.GetComponent(grymTarget);
+        if (transform) {
+            targetPos = transform->GetPosition();
+            useEntityWalkTo = true;
+        }
+    }
+
+    if (!useEntityWalkTo) {
+        // Target is likely an OBB (spatial bounds) or other non-entity symbol.
+        // Use Merlin's worldPos() CInterface to extract the position.
+        auto mpos = MerlinLua::worldPos(cmd.target);
+        targetPos = XMFLOAT3(mpos.floats[0], mpos.floats[1], mpos.floats[2]);
+    }
+
+    // Check arrival (same 1.5m threshold GRYM uses in update_walkto_action)
+    XMFLOAT3 currentPos = character.GetPositionInterpolated();
+    float dx = targetPos.x - currentPos.x;
+    float dz = targetPos.z - currentPos.z;
+    float distSq = dx * dx + dz * dz;
+
+    if (distSq <= 1.5f * 1.5f) {
+        // Arrived — signal success and go idle
+        cmd.outcome = ACTION_OUTCOME_SUCCESS;
+        character.SetAction(scene, wi::scene::character_system::make_idle(scene, character));
+        return;
+    }
+
+    // Set the GRYM action (SetAction deduplicates — safe to call every frame)
+    if (useEntityWalkTo) {
+        // Entity target: use make_walk_to which reads the entity's transform each frame
+        auto action = wi::scene::character_system::make_walk_to(scene, character, grymTarget);
+        character.SetAction(scene, action);
+    } else {
+        // OBB target: compute direction and use make_walk
+        float dist = sqrtf(distSq);
+        XMFLOAT3 dir = {dx / dist, 0.0f, dz / dist};
+        auto action = wi::scene::character_system::make_walk(scene, character, dir);
+        character.SetAction(scene, action);
+    }
+}
+
+void GameStartup::ProcessActionCommands(wi::scene::Scene &scene) {
+    for (auto &[merlinId, entry] : grym_merlin_entity_table) {
+        if (!entry.actionBuffer)
+            continue;
+        auto *character = scene.characters.GetComponent(entry.grymEntity);
+        if (!character)
+            continue;
+
+        for (int motor = 0; motor < ForeignActionCommandBuffer::NUM_MOTORS; motor++) {
+            auto &cmd = entry.actionBuffer->commands[motor];
+            if (!cmd.active)
+                continue;
+
+            auto it = actionDispatchTable.find(cmd.actionLabelHstr);
+            if (it != actionDispatchTable.end()) {
+                it->second(scene, *character, cmd, grym_merlin_entity_table);
+            }
+        }
     }
 }

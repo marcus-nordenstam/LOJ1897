@@ -38,7 +38,7 @@ function initMerlin(projectPath, commonPath)
     mxu.safeRegisterCallback("giveBirth", function(arg1, arg2, arg3, arg4) return giveBirth(arg1) end)
     mxu.safeRegisterCallback("siblingRel", function(arg1, arg2, arg3, arg4) return siblingRel(arg1) end)
     mxu.safeRegisterCallback("acquireBuilding", function(arg1, arg2, arg3, arg4) return acquireBuilding(arg1) end)
-    mxu.safeRegisterCallback("walkTo", function(arg1, arg2, arg3, arg4) return walkTo(arg1, arg2) end)
+    -- walkTo is now handled by (fillForeignActionBuffer) action function, not Lua callback
     mxu.safeRegisterCallback("turnTo", function(arg1, arg2, arg3, arg4) return turnTo(arg1, arg2) end)
 
     mxu.safeRegisterSoundCallback(function(arg) return makeSoundBubble(arg) end)
