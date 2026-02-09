@@ -67,6 +67,9 @@ class GameStartup {
     
     // Proximity-based spawning/despawning of GRYM entities from Merlin environment
     void UpdateProximitySpawning(wi::scene::Scene &scene, const XMFLOAT3 &playerPos, float dt);
+    
+    // Feed GRYM physics-resolved positions back to Merlin for all entities in grym_merlin_entity_table
+    void FeedbackGrymPositions(wi::scene::Scene &scene);
 
     // Getters for state
     const std::string &GetProjectPath() const { return wi::Project::ptr()->path; }
@@ -119,9 +122,9 @@ class GameStartup {
     bool guardScriptLoaded = false;
 
     // Generic bidirectional mapping between Merlin environment entities and GRYM scene entities
-    // Key: Merlin entity ID (string representation of symbol)
+    // Key: Merlin entity symbol (raw uint64, exact bits — no lossy conversion)
     // Value: GRYM entity and despawn timer
-    std::unordered_map<std::string, GrymMerlinEntityEntry> grym_merlin_entity_table;
+    std::unordered_map<uint64_t, GrymMerlinEntityEntry> grym_merlin_entity_table;
 
     // Fullscreen state
     bool isFullscreen = false;

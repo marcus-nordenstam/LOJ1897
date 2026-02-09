@@ -328,7 +328,12 @@ void NoesisRenderPath::Update(float dt) {
         wi::ecs::Entity playerCharacter = gameStartup.GetPlayerCharacter();
         wi::scene::Scene &scene = wi::scene::GetScene();
         
-        // Update player position in Merlin environment
+        // 1. Feed GRYM physics-resolved positions back to Merlin.
+        //    GRYM owns real-time physics (gravity, collisions). After each frame,
+        //    the resolved positions must flow back so Merlin has ground-truth positions.
+        gameStartup.FeedbackGrymPositions(scene);
+        
+        // 2. Update player position in Merlin environment
         if (playerCharacter != wi::ecs::INVALID_ENTITY) {
             auto* playerChar = scene.characters.GetComponent(playerCharacter);
             if (playerChar) {
@@ -337,10 +342,10 @@ void NoesisRenderPath::Update(float dt) {
             }
         }
         
+        // 3. Run Merlin simulation (with corrected positions from GRYM)
         gameStartup.merlinLua.Update(dt);
         
-        // Update proximity-based spawning/despawning of GRYM entities from Merlin
-        // Uses previous frame's player position (fine for 100m range check)
+        // 4. Proximity-based spawning/despawning of GRYM entities from Merlin
         if (playerCharacter != wi::ecs::INVALID_ENTITY) {
             auto* playerChar = scene.characters.GetComponent(playerCharacter);
             if (playerChar) {

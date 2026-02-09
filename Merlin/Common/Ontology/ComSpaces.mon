@@ -2,6 +2,7 @@
 
 space //obs
     gameSpace
+        waypoint
         spawnSpace
     interiorSpace
         entrance

@@ -19,6 +19,28 @@ dofile(merlin_path .. "/Game/Scripts/sim.lua")
 require("globals")
 -- NO drawing, rendering, or GUI modules loaded
 
+-- ---------------------------------------------------------------------------
+-- Shared C buffers for Merlin <-> GRYM entity sync.
+-- Layout matches EntitySyncEntry / EntitySyncBuffer in MerlinLua.h exactly.
+-- uint64 entity symbols stay as raw uint64 — no double/string conversion.
+-- ---------------------------------------------------------------------------
+ffi.cdef[[
+    typedef struct {
+        uint64_t merlinId;
+        float x, y, z;
+        char modelPath[260];
+    } EntitySyncEntry;
+
+    typedef struct {
+        EntitySyncEntry entries[256];
+        int count;
+    } EntitySyncBuffer;
+]]
+
+-- Cast lightuserdata pointers (set by C++ in MerlinLua::Initialize) to FFI struct pointers
+local npcStateBuf    = ffi.cast("EntitySyncBuffer*", g_npcStateBufferPtr)
+local posFeedbackBuf = ffi.cast("EntitySyncBuffer*", g_posFeedbackBufferPtr)
+
 -- Global player entity
 playerEntity = nil
 
@@ -62,42 +84,71 @@ function merlinUpdatePlayerPos(x, y, z)
     mx.setLocalBoundsAttr(playerEntity, "obb", newObb)
 end
 
-function merlinCreateNpcs(spawnPoints, npcModelPath)
+function merlinCreateNpcs(spawnPoints, npcModelPath, waypointPositions)
     -- Create NPCs at spawn points from scene metadata
     -- spawnPoints: table of {x, y, z} positions in meters
     -- npcModelPath: path to NPC model file (e.g. .grs) for GRYM rendering
+    -- waypointPositions: table of {x, y, z} waypoint positions in meters
     if spawnPoints == nil then
         spawnPoints = {}
     end
     if npcModelPath == nil then
         npcModelPath = ""
     end
-    createRootNpcs(spawnPoints, npcModelPath)
+    if waypointPositions == nil then
+        waypointPositions = {}
+    end
+    createRootNpcs(spawnPoints, npcModelPath, waypointPositions)
 end
 
 function merlinGetNpcStates()
-    -- Return a table of all Merlin NPC states for GRYM proximity spawning
-    local states = {}
+    -- Fill the shared npcStateBuffer with current NPC states.
+    -- uint64 merlinId stays as raw uint64 in the buffer — no conversion.
+    local idx = 0
     for _, npc in mxu.iter(mx.npcs()) do
-        local pos = mx.worldPos(npc)
-        local npcId = tostring(npc)  -- unique Merlin symbol as string key
+        if idx >= 256 then break end
         
-        -- Get modelPath attribute (default to empty string if not set)
+        local pos = mx.worldPos(npc)
+        npcStateBuf.entries[idx].merlinId = npc  -- raw uint64 symbol, no conversion
+        npcStateBuf.entries[idx].x = pos.floats[0]
+        npcStateBuf.entries[idx].y = pos.floats[1]
+        npcStateBuf.entries[idx].z = pos.floats[2]
+        
+        -- Get modelPath attribute
         local modelPathAttr = mx.attrSymbol(npc, "modelPath")
-        local modelPath = ""
         if modelPathAttr ~= nil and modelPathAttr ~= 0 then
-            modelPath = mxu.toLuaString(modelPathAttr)
+            local mp = mxu.toLuaString(modelPathAttr)
+            if #mp < 260 then
+                ffi.copy(npcStateBuf.entries[idx].modelPath, mp)
+            else
+                ffi.copy(npcStateBuf.entries[idx].modelPath, mp, 259)
+                npcStateBuf.entries[idx].modelPath[259] = 0
+            end
+        else
+            npcStateBuf.entries[idx].modelPath[0] = 0
         end
         
-        table.insert(states, {
-            id = npcId,
-            x = pos.floats[0],
-            y = pos.floats[1],
-            z = pos.floats[2],
-            modelPath = modelPath
-        })
+        idx = idx + 1
     end
-    return states
+    npcStateBuf.count = idx
+end
+
+function merlinApplyPosFeedback()
+    -- Read GRYM physics-resolved positions from the shared posFeedbackBuffer
+    -- and apply them to the corresponding Merlin entities.
+    -- uint64 merlinId is read as raw uint64 cdata — directly usable as Merlin symbol.
+    for i = 0, posFeedbackBuf.count - 1 do
+        local entry = posFeedbackBuf.entries[i]
+        local entity = entry.merlinId  -- uint64 cdata, directly usable with mx.* FFI calls
+        
+        local obb = mx.worldBounds(entity)
+        local size = mxu.float3(obb.floats[3], obb.floats[4], obb.floats[5])
+        local quat = mxu.quat(obb.floats[6], obb.floats[7], obb.floats[8], obb.floats[9])
+        local newPos = mxu.float3(entry.x, entry.y, entry.z)
+        local newObb = mx.composeBounds(newPos, size, quat)
+        
+        mx.setLocalBoundsAttr(entity, "obb", newObb)
+    end
 end
 
 function merlinUpdate(dt)

@@ -275,15 +275,56 @@ function birthRootNpc(gender, socialClass, knowledge, rules, manSurnameSymbol, s
     return npc
 end
 
-function createRootNpcs(spawnPoints, npcModelPath)
+function injectWaypointKnowledge(npc, waypointEntity, waypointObb)
+    -- Inject knowledge about a waypoint into an NPC's mind
+    -- Follows the pattern from Merlin/Game/Knowledge/Waypoint.mc
+    mx.enterMind(npc)
+    
+    -- Create mental representation of the waypoint
+    local mwaypoint = mx.observe(waypointEntity)
+    
+    -- Create bindings for ?waypoint and ?obb variables
+    local bindings = mxu.makeBindings({
+        "?waypoint", mwaypoint,
+        "?obb", waypointObb
+    })
+    
+    -- Inject each pattern from Waypoint.mc
+    mx.believe("{ ?waypoint isa [k waypoint] }", bindings)
+    mx.believe("{ ?waypoint obb ?obb }", bindings)
+    
+    mx.enterAbsMind()
+end
+
+function createRootNpcs(spawnPoints, npcModelPath, waypointPositions)
     -- Create NPCs at spawn points from scene metadata
     -- spawnPoints: table of {x, y, z} positions in meters
     -- npcModelPath: path to NPC model file for GRYM rendering
+    -- waypointPositions: table of {x, y, z} waypoint positions in meters
     if spawnPoints == nil then
         spawnPoints = {}
     end
     if npcModelPath == nil then
         npcModelPath = ""
+    end
+    if waypointPositions == nil then
+        waypointPositions = {}
+    end
+    
+    -- Create waypoint entities in Merlin environment
+    local waypointEntities = {}
+    local birthTime = mx.makeSeconds(1720, 3, 0, 6, 0, 0)
+    for i = 1, #waypointPositions do
+        local wpPos = mxu.float3(waypointPositions[i].x, waypointPositions[i].y, waypointPositions[i].z)
+        local wpSize = mxu.float3(1.0, 1.0, 1.0)  -- 1m cube
+        local wpQuat = mxu.quat(0, 0, 0, 1)
+        local wpObb = mx.composeBounds(wpPos, wpSize, wpQuat)
+        
+        -- Create waypoint entity (kind "waypoint" is set automatically by makeRootEntityAtTime)
+        local waypoint = mx.makeRootEntityAtTime("waypoint", "waypoint", birthTime, wpObb)
+        mx.setOccluder(waypoint, false)
+        
+        table.insert(waypointEntities, {entity = waypoint, obb = wpObb})
     end
     
     -- Loop through each spawn point and create a Merlin NPC
@@ -305,6 +346,12 @@ function createRootNpcs(spawnPoints, npcModelPath)
         -- Position NPC at spawn point
         mx.setLocalBoundsAttr(npc, "obb", mx.composeBounds(spawnPos, npcSize, unitQuat))
         resolveNpcOverlaps(npc, 4)
+        
+        -- Inject waypoint knowledge into this NPC's mind
+        for j = 1, #waypointEntities do
+            local wp = waypointEntities[j]
+            injectWaypointKnowledge(npc, wp.entity, wp.obb)
+        end
         
         -- Enable NPC to see the environment
         mx.allPerceive()

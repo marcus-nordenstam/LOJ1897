@@ -54,6 +54,14 @@ bool MerlinLua::Initialize(const std::string& merlin_path) {
     lua_pushstring(L, merlin_path.c_str());
     lua_setglobal(L, "merlin_path");
     
+    // Pass shared buffer pointers to Lua as lightuserdata.
+    // Lua will cast these to FFI struct pointers for direct read/write.
+    // uint64 entity symbols flow through these buffers raw — no double conversion.
+    lua_pushlightuserdata(L, &npcStateBuffer);
+    lua_setglobal(L, "g_npcStateBufferPtr");
+    lua_pushlightuserdata(L, &posFeedbackBuffer);
+    lua_setglobal(L, "g_posFeedbackBufferPtr");
+    
     // Adjust package.path to include Merlin scripts and Lua directory
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "path");
@@ -193,13 +201,13 @@ void MerlinLua::UpdatePlayerPosition(const XMFLOAT3& position) {
     }
 }
 
-void MerlinLua::CreateNpcs(const std::vector<XMFLOAT3>& spawnPoints, const std::string& npcModelPath) {
+void MerlinLua::CreateNpcs(const std::vector<XMFLOAT3>& spawnPoints, const std::string& npcModelPath, const std::vector<XMFLOAT3>& waypointPositions) {
     if (!L) {
         wi::backlog::post("ERROR: Cannot create NPCs - Merlin Lua not initialized\n");
         return;
     }
     
-    // Call merlinCreateNpcs(spawnPoints, npcModelPath)
+    // Call merlinCreateNpcs(spawnPoints, npcModelPath, waypoints)
     lua_getglobal(L, "merlinCreateNpcs");
     if (!lua_isfunction(L, -1)) {
         char buffer[512];
@@ -235,18 +243,41 @@ void MerlinLua::CreateNpcs(const std::vector<XMFLOAT3>& spawnPoints, const std::
     // Push npcModelPath string
     lua_pushstring(L, npcModelPath.c_str());
     
+    // Push waypoints table to Lua (positions in meters)
+    lua_newtable(L);
+    for (size_t i = 0; i < waypointPositions.size(); i++) {
+        lua_pushinteger(L, i + 1); // Lua uses 1-based indexing
+        lua_newtable(L);
+        
+        // Push x, y, z (in meters)
+        lua_pushstring(L, "x");
+        lua_pushnumber(L, waypointPositions[i].x);
+        lua_settable(L, -3);
+        
+        lua_pushstring(L, "y");
+        lua_pushnumber(L, waypointPositions[i].y);
+        lua_settable(L, -3);
+        
+        lua_pushstring(L, "z");
+        lua_pushnumber(L, waypointPositions[i].z);
+        lua_settable(L, -3);
+        
+        lua_settable(L, -3);
+    }
+    
     char buffer[512];
-    sprintf_s(buffer, "Creating Merlin NPCs at %zu spawn points with model: %s\n", 
-              spawnPoints.size(), npcModelPath.c_str());
+    sprintf_s(buffer, "Creating Merlin NPCs at %zu spawn points with model: %s (%zu waypoints)\n", 
+              spawnPoints.size(), npcModelPath.c_str(), waypointPositions.size());
     wi::backlog::post(buffer);
     
-    if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
+    if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
         const char* error_msg = lua_tostring(L, -1);
         sprintf_s(buffer, "ERROR: merlinCreateNpcs() failed: %s\n", error_msg ? error_msg : "unknown error");
         wi::backlog::post(buffer);
         lua_pop(L, 1);
     } else {
-        sprintf_s(buffer, "Merlin NPCs created successfully at %zu spawn points\n", spawnPoints.size());
+        sprintf_s(buffer, "Merlin NPCs created successfully at %zu spawn points with %zu waypoints\n", 
+                  spawnPoints.size(), waypointPositions.size());
         wi::backlog::post(buffer);
     }
 }
@@ -258,14 +289,14 @@ std::vector<NpcState> MerlinLua::GetNpcStates() {
         return states;
     }
     
-    // Call merlinGetNpcStates() to get NPC data
+    // Trigger Lua to fill the shared npcStateBuffer (no data through the Lua stack)
     lua_getglobal(L, "merlinGetNpcStates");
     if (!lua_isfunction(L, -1)) {
         lua_pop(L, 1);
         return states;
     }
     
-    if (lua_pcall(L, 0, 1, 0) != LUA_OK) {
+    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
         const char* error_msg = lua_tostring(L, -1);
         char buffer[512];
         sprintf_s(buffer, "ERROR: merlinGetNpcStates() failed: %s\n", error_msg ? error_msg : "unknown error");
@@ -274,64 +305,52 @@ std::vector<NpcState> MerlinLua::GetNpcStates() {
         return states;
     }
     
-    // Parse the returned table
-    if (!lua_istable(L, -1)) {
-        lua_pop(L, 1);
-        return states;
+    // Read from the shared buffer — uint64 IDs come through with exact bits intact
+    states.reserve(npcStateBuffer.count);
+    for (int i = 0; i < npcStateBuffer.count; i++) {
+        NpcState state;
+        state.merlinId = npcStateBuffer.entries[i].merlinId;
+        state.x = npcStateBuffer.entries[i].x;
+        state.y = npcStateBuffer.entries[i].y;
+        state.z = npcStateBuffer.entries[i].z;
+        state.modelPath = npcStateBuffer.entries[i].modelPath;
+        states.push_back(state);
     }
-    
-    // Iterate through the array
-    size_t len = lua_objlen(L, -1);  // Lua 5.1 compatibility
-    for (size_t i = 1; i <= len; i++) {
-        lua_rawgeti(L, -1, i);  // Push states[i]
-        
-        if (lua_istable(L, -1)) {
-            NpcState state;
-            
-            // Get id
-            lua_getfield(L, -1, "id");
-            if (lua_isstring(L, -1)) {
-                state.merlinId = lua_tostring(L, -1);
-            }
-            lua_pop(L, 1);
-            
-            // Get x
-            lua_getfield(L, -1, "x");
-            if (lua_isnumber(L, -1)) {
-                state.x = static_cast<float>(lua_tonumber(L, -1));
-            }
-            lua_pop(L, 1);
-            
-            // Get y
-            lua_getfield(L, -1, "y");
-            if (lua_isnumber(L, -1)) {
-                state.y = static_cast<float>(lua_tonumber(L, -1));
-            }
-            lua_pop(L, 1);
-            
-            // Get z
-            lua_getfield(L, -1, "z");
-            if (lua_isnumber(L, -1)) {
-                state.z = static_cast<float>(lua_tonumber(L, -1));
-            }
-            lua_pop(L, 1);
-            
-            // Get modelPath
-            lua_getfield(L, -1, "modelPath");
-            if (lua_isstring(L, -1)) {
-                state.modelPath = lua_tostring(L, -1);
-            }
-            lua_pop(L, 1);
-            
-            states.push_back(state);
-        }
-        
-        lua_pop(L, 1);  // Pop states[i]
-    }
-    
-    lua_pop(L, 1);  // Pop the states table
     
     return states;
+}
+
+void MerlinLua::BeginPositionFeedback() {
+    posFeedbackBuffer.count = 0;
+}
+
+void MerlinLua::AddPositionFeedback(uint64_t merlinId, const XMFLOAT3& position) {
+    if (posFeedbackBuffer.count >= EntitySyncBuffer::CAPACITY) return;
+    
+    int idx = posFeedbackBuffer.count++;
+    posFeedbackBuffer.entries[idx].merlinId = merlinId;
+    posFeedbackBuffer.entries[idx].x = position.x;
+    posFeedbackBuffer.entries[idx].y = position.y;
+    posFeedbackBuffer.entries[idx].z = position.z;
+}
+
+void MerlinLua::ApplyPositionFeedback() {
+    if (!L || posFeedbackBuffer.count == 0) return;
+    
+    // Trigger Lua to read the posFeedbackBuffer and apply positions to Merlin entities
+    lua_getglobal(L, "merlinApplyPosFeedback");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 1);
+        return;
+    }
+    
+    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+        const char* error_msg = lua_tostring(L, -1);
+        char buffer[512];
+        sprintf_s(buffer, "ERROR: merlinApplyPosFeedback() failed: %s\n", error_msg ? error_msg : "unknown error");
+        wi::backlog::post(buffer);
+        lua_pop(L, 1);
+    }
 }
 
 void MerlinLua::Update(float dt) {
