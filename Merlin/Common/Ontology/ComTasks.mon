@@ -1,0 +1,74 @@
+
+# NOTE: Words in parenthesis -- such as (traits) and (emo) -- are used for GROUPING only: they don't define a sub-category.
+
+relation
+
+    behaviour /noun
+
+        # /noun = defines 'task' as a noun
+        # For all subsequent definitions:
+        # * Assume that they are tasks: //task
+        # * Assume that their subject field is is always a human: //sub human
+        task /noun //task //sub human
+
+            # ----------------------------------------------------------------------------------
+            # abstract tasks - no motors involved
+            # ----------------------------------------------------------------------------------
+            startup
+            infer
+
+            acquire                                 /tar object
+            buy                                     /tar ?
+            grant                                   /tar object              /aux human
+
+            identify                                /tar object
+            getAcquaintedWith                       /tar human
+            seekAnswers
+            marry
+
+            # Performing a job
+            perform                                 /tar job
+
+            # Domain-specific tasks
+            foundOrg                                /tar org
+            processTitleDeed                        /aux structure|space
+            introduceSiblings
+
+            startConv                               /tar conversation
+            endConv                                 /tar conversation
+
+            tell_about                              /sub @msgAuthor human /aux @msgAudience human
+
+            # ----------------------------------------------------------------------------------
+            # physical tasks - motors are involved
+            # ----------------------------------------------------------------------------------
+            #tell                /motor mouth            /sub @msgAuthor human   /tar @msg @excl @S     /aux @msgAudience human
+            #ask                 /motor mouth            /sub @msgAuthor human   /tar @qs @excl @S      /aux @msgAudience human
+
+            approach            /motor legs             /tar @excl
+            go                  /motor legs             /tar @excl
+            keepInReachOf       /motor legs             /tar @excl
+            # Mind motor given because we want to be able to turn/face while walking
+            keepFacing          /motor mind             /tar @excl
+
+            explore             /motor legs             /tar @excl
+            locate              /motor legs             /tar @excl
+
+            drop                /motor hands            /tar @excl object
+            give                /motor hands            /tar @excl object
+            receive             /motor hands            /tar @excl object
+
+            get                 /motor legs hands       /tar @excl object
+
+            read                /motor eyes hands       /tar @excl document
+            write               /motor eyes hands legs  /tar @excl document
+
+            stackGet            /motor legs hands       /tar object /aux stack
+            stackPut            /motor legs hands       /tar object /aux stack
+            stackBrowse         /motor legs hands       /tar stack
+            stackRead           /motor legs hands       /tar stack
+            makeDoneStack                               /tar stack
+
+            giveBirth           /motor eyes hands legs
+            perceiveAttr        /motor eyes             /tar ?
+

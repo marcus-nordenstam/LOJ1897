@@ -1,0 +1,11 @@
+# Kinds of sounds
+
+sound //hear
+    squeak
+    speech
+    shout
+    song
+    scream
+    laugh
+    crash
+    boom

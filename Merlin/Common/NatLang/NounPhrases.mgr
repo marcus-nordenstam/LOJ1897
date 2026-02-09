@@ -1,0 +1,62 @@
+
+:REG_NP
+
+# Category names can pass through an internal translation table so we don't have
+# have to write phrases for every category-name.
+#
+# When two phrases match, but one of them involves a variable, then
+# the non-variable one always takes precedence.  This is how we always get
+# 'role npc' -> "stranger", and not "npc".
+
+# Specific category overrides:
+
+# General categories
+
+"unknown"
+@unknown
+.
+
+"unsure"
+@unknown%
+.
+
+"nothing"
+@nothing
+.
+
+# e.g. "my mother"
+"my $rel(REL)"
+( o { ?_I /pres $rel(REL) @o } )
+.
+
+# e.g. "your mother"
+"your $rel(REL)"
+( o { ?_you /pres $rel(REL) @o } )
+.
+
+# e.g. "John's mother"
+"$pname(PNAME) ++'s $rel(REL)"
+( o { $pname(PNAME) /pres $rel(REL) @o } )
+.
+
+"$thing(INDEF_KIND) at $np(NP)"
+$thing(INDEF_KIND)  { @o /pres obb $np(NP) }
+.
+
+"$thing(INDEF_KIND) named $pname(PNAME) at $np(NP)"
+$thing(INDEF_KIND) $pname(PNAME) { @o /pres obb $np(NP) }
+.
+
+"that $sub_np(NP) marries $obj_np(NP)"
+{ $sub_np(NP) /pres marry $obj_np(NP) }
+.
+
+
+# HACK!
+# we need to do this in some other way, but for the moment, let's define npc and player as complete NP
+"npc"       npc     .
+"player"    player  .
+
+# A general noun-phrase:
+
+:NP = VARIABLE|PRONOUN|REG_NP|PNAME

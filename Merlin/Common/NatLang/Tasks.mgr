@@ -1,0 +1,26 @@
+
+:SPECIAL_TASK
+"gives $obj_np(NP) to $rec_np(NP)"  /pres give $obj_np(NP) $rec_np(NP)     .
+"gave $obj_np(NP) to $rec_np(NP)"   /past give $obj_np(NP) $rec_np(NP)     .
+
+:TRANS_TASK
+"is getting acquainted with"    /pres getAcquaintedWith         .
+"was getting acquainted with"   /past getAcquaintedWith         .
+"maintains that"                /pres maintain                  .
+"maintained that"               /past maintain                  .
+"goes to"                       /pres go                        .
+"went to"                       /past go                        .
+"wants to know"                 /pres seekAnswers               .
+"wanted to know"                /past seekAnswers               .
+"gets"                          /pres get                       .
+"got"                           /past get                       .
+
+:INTRANS_TASK
+"prepares to enter the game"                        /pres startup               .
+"prepared to enter the game"                        /past startup               .
+"starts the $conv(NP) conversation"                 /pres startConv $conv(NP)   .
+"started the $conv(NP) conversation"                /past startConv $conv(NP)   .
+"starts wrapping up the $conv(NP) conversation"     /pres endConv $conv(NP)     .
+"started wrapping up the $conv(NP) conversation"    /past endConv $conv(NP)     .
+"ends the $conv(NP) conversation"                   /pres DESTROY_CONV_META_ENT $conv(NP)  .
+"ended the $conv(NP) conversation"                  /past DESTROY_CONV_META_ENT $conv(NP)  .

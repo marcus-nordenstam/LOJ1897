@@ -323,6 +323,11 @@ void NoesisRenderPath::Stop() {
 void NoesisRenderPath::Update(float dt) {
     RenderPath3D::Update(dt);
 
+    // Update Merlin Lua subsystem only when not in main menu mode
+    if (!inMainMenuMode) {
+        gameStartup.merlinLua.Update(dt);
+    }
+
     // Update notification fade-out
     if (notificationTimer > 0.0f) {
         notificationTimer -= dt;
@@ -678,22 +683,23 @@ void NoesisRenderPath::Update(float dt) {
         }
 
         // Update NPC behavior
-        const auto &npcEntities = gameStartup.GetNPCEntities();
-        if ((gameStartup.IsPatrolScriptLoaded() || gameStartup.IsGuardScriptLoaded()) &&
-            !npcEntities.empty()) {
-            for (auto npc : npcEntities) {
-                if (npc == wi::ecs::INVALID_ENTITY) {
-                    continue;
-                }
-                const wi::scene::MindComponent *mind = scene.minds.GetComponent(npc);
-                if (mind == nullptr || mind->scriptCallback.empty()) {
-                    continue;
-                }
-                std::string lua_call = mind->scriptCallback + "(" + std::to_string(npc) + ", " +
-                                       std::to_string(dt) + ")";
-                wi::lua::RunText(lua_call);
-            }
-        }
+        // NOTE: Old GrymEngine Lua NPC script callbacks disabled - now using Merlin AI
+        // const auto &npcEntities = gameStartup.GetNPCEntities();
+        // if ((gameStartup.IsPatrolScriptLoaded() || gameStartup.IsGuardScriptLoaded()) &&
+        //     !npcEntities.empty()) {
+        //     for (auto npc : npcEntities) {
+        //         if (npc == wi::ecs::INVALID_ENTITY) {
+        //             continue;
+        //         }
+        //         const wi::scene::MindComponent *mind = scene.minds.GetComponent(npc);
+        //         if (mind == nullptr || mind->scriptCallback.empty()) {
+        //             continue;
+        //         }
+        //         std::string lua_call = mind->scriptCallback + "(" + std::to_string(npc) + ", " +
+        //                                std::to_string(dt) + ")";
+        //         wi::lua::RunText(lua_call);
+        //     }
+        // }
     }
 }
 
@@ -924,8 +930,11 @@ void NoesisRenderPath::InitializeNoesis() {
 
         // gameStartup.StopMenuMusic();
 
-        // Scene is already loaded during initialization, just initialize camera
+        // Load the game scene when Play Game is pressed
         wi::scene::Scene &scene = wi::scene::GetScene();
+        gameStartup.LoadGameScene(scene);
+
+        // Initialize camera after scene is loaded
         wi::ecs::Entity playerCharacter = gameStartup.GetPlayerCharacter();
         if (playerCharacter != wi::ecs::INVALID_ENTITY) {
             wi::scene::CharacterComponent *playerChar =

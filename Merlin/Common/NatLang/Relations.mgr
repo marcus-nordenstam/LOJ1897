@@ -1,0 +1,42 @@
+
+:ACTIVE_REL
+"lives at"              /pres home              .
+"lived at"              /past home              .
+
+
+:PASSIVE_PNAME_REL
+"name is"               /pres name              .
+"name was"              /past name              .
+
+
+:PASSIVE_NUM_REL
+"age is"                /pres age               .
+"age was"               /past age               .
+
+
+:PASSIVE_REL
+"$rel(REL) includes"    /pres $rel(REL) ~       .
+"$rel(REL) included"    /past $rel(REL) ~       .
+"$rel(REL) excludes"    /pres $rel(REL) ^       .
+"$rel(REL) excluded"    /past $rel(REL) ^       .
+"$rel(REL) is"          /pres $rel(REL)         .
+"$rel(REL) was"         /past $rel(REL)         .
+
+:PASSIVE_REL_PLUR
+"$rel(REL) includes"    /pres $rel(REL) ~       .
+"$rel(REL) included"    /past $rel(REL) ~       .
+"$rel(REL) excludes"    /pres $rel(REL) ^       .
+"$rel(REL) excluded"    /past $rel(REL) ^       .
+"$rel(REL) are"         /pres $rel(REL)         .
+"$rel(REL) were"        /past $rel(REL)         .
+
+:REL
+"fiancee"               fiancee                 .
+"spouse"                spouse                  .
+"mother"                mother                  .
+"father"                father                  .
+"brother"               brother                 .
+"sister"                sister                  .
+"marriage prospect"     marriageProspect        .
+"family"                family                  .
+"game-role"             game_role               .

@@ -1,0 +1,18 @@
+
+:MSG
+
+# Formulaic phrases first
+
+"'('  $form(FORM) ')'"
+$form(FORM)
+.
+
+# Then non-formulaics:
+
+"'('  $st(ST) ')'"
+( msg $st(ST) )
+.
+
+"'('  $np(NP) ')'"
+( msg $np(NP) )
+.

@@ -1,0 +1,23 @@
+
+rule ->
+(import "ASK")
+(import "DESTROY_CONV_META_ENT")
+(import "MAKE_DONE_STACK")
+(import "PERCEIVE_ATTR")
+(import "READ")
+(import "STACK_PUT")
+(import "STACK_TAKE")
+(import "TELL")
+(import "OFFER")
+(import "TAKE")
+(import "HAVE_SEX_WITH")
+(import "MAKE_CONV_META_ENT")
+(import "GIVE_BIRTH")
+(import "DIE")
+(import "WALK_TO")
+(import "WEAR")
+(import "WRITE_DOC")
+(import "SPAWN")
+(import "TURN_TO")
+(import "ACQUIRE")
+.

@@ -43,6 +43,9 @@ void GameStartup::Initialize(Noesis::Grid *menu, Noesis::TextBox *seed, Noesis::
 void GameStartup::Shutdown() {
     StopMenuMusic();
 
+    // Shutdown Merlin Lua subsystem
+    merlinLua.Shutdown();
+
     menuContainer.Reset();
     seedTextBox.Reset();
     playGameButton.Reset();
@@ -143,13 +146,14 @@ void GameStartup::InitializeAnimationSystem(wi::scene::Scene &scene) {
             // Animation library is now loaded automatically by Project
             // Just trigger the load to make sure it's up to date
             int count = wi::Project::ptr()->LoadAnimationLibrary();
-            
+
             sprintf_s(buffer, "Animation library loaded with %d animations\n", count);
             wi::backlog::post(buffer);
-            
+
             // List all loaded animations
             for (size_t i = 0; i < wi::Project::ptr()->GetAnimationCount(); ++i) {
-                const wi::scene::Animation *anim = wi::Project::ptr()->GetAnimation(static_cast<wi::scene::AnimationIndex>(i));
+                const wi::scene::Animation *anim =
+                    wi::Project::ptr()->GetAnimation(static_cast<wi::scene::AnimationIndex>(i));
                 if (anim != nullptr) {
                     sprintf_s(buffer, "Found animation '%s'\n", anim->name.c_str());
                     wi::backlog::post(buffer);
@@ -413,12 +417,13 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
     if (modelRoot != wi::ecs::INVALID_ENTITY && humanoidEntity != wi::ecs::INVALID_ENTITY) {
         // Store humanoid entity reference for animation playback component
         character.humanoidEntity = humanoidEntity;
-        
+
         // Determine character gender from model path (simplified: check for "fem")
         std::string modelPathLower = modelPath;
-        std::transform(modelPathLower.begin(), modelPathLower.end(), modelPathLower.begin(), ::tolower);
+        std::transform(modelPathLower.begin(), modelPathLower.end(), modelPathLower.begin(),
+                       ::tolower);
         bool isFemale = (modelPathLower.find("fem") != std::string::npos);
-        
+
         auto *project = wi::Project::ptr();
         if (project != nullptr) {
             // Find gender-appropriate animations
@@ -437,12 +442,12 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
                 character.action_anim_indices[(int)wi::scene::ActionVerb::Run] =
                     project->FindAnimationBySubstrings({"_male", "run"});
             }
-            
+
             // Gender-neutral animations
             wi::scene::AnimationIndex sit_anim = project->FindAnimationBySubstrings({"sit"});
             character.action_anim_indices[(int)wi::scene::ActionVerb::Sit] = sit_anim;
             character.action_anim_indices[(int)wi::scene::ActionVerb::Stand] = sit_anim;
-            
+
             // WalkTo uses same animation as Walk
             character.action_anim_indices[(int)wi::scene::ActionVerb::WalkTo] =
                 character.action_anim_indices[(int)wi::scene::ActionVerb::Walk];
@@ -474,67 +479,9 @@ wi::ecs::Entity GameStartup::SpawnCharacter(wi::scene::Scene &scene, const std::
     return characterEntity;
 }
 
-void GameStartup::LoadNPCScripts() {
-    std::string basePath = GetProjectPath();
-    if (!basePath.empty() && basePath.back() != '/' && basePath.back() != '\\') {
-        basePath += "/";
-    }
+void GameStartup::LoadNPCScripts() {}
 
-    if (!patrolScriptLoaded) {
-        std::vector<std::string> script_paths = {basePath + "Content/scripts/npc/patrol.lua",
-                                                 basePath + "SharedContent/scripts/npc/patrol.lua",
-                                                 basePath + "scripts/npc/patrol.lua"};
-
-        for (const auto &patrol_script_path : script_paths) {
-            if (wi::helper::FileExists(patrol_script_path)) {
-                wi::lua::RunFile(patrol_script_path);
-                patrolScriptLoaded = true;
-                char buffer[512];
-                sprintf_s(buffer, "Loaded NPC patrol script from: %s\n",
-                          patrol_script_path.c_str());
-                wi::backlog::post(buffer);
-                break;
-            }
-        }
-
-        if (!patrolScriptLoaded) {
-            wi::backlog::post("WARNING: NPC patrol script not found in any location\n");
-        }
-    }
-
-    if (!guardScriptLoaded) {
-        std::vector<std::string> script_paths = {basePath + "Content/scripts/npc/guard.lua",
-                                                 basePath + "SharedContent/scripts/npc/guard.lua",
-                                                 basePath + "scripts/npc/guard.lua"};
-
-        for (const auto &guard_script_path : script_paths) {
-            if (wi::helper::FileExists(guard_script_path)) {
-                wi::lua::RunFile(guard_script_path);
-                guardScriptLoaded = true;
-                char buffer[512];
-                sprintf_s(buffer, "Loaded NPC guard script from: %s\n", guard_script_path.c_str());
-                wi::backlog::post(buffer);
-                break;
-            }
-        }
-
-        if (!guardScriptLoaded) {
-            wi::backlog::post("WARNING: NPC guard script not found in any location\n");
-        }
-    }
-}
-
-void GameStartup::CleanupNPCScripts() {
-    if (patrolScriptLoaded) {
-        wi::lua::RunText("npc_patrol_clear_all()");
-        patrolScriptLoaded = false;
-    }
-    if (guardScriptLoaded) {
-        wi::lua::RunText("npc_guard_clear_all()");
-        guardScriptLoaded = false;
-    }
-    npcEntities.clear();
-}
+void GameStartup::CleanupNPCScripts() { npcEntities.clear(); }
 
 void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
     auto startTime = std::chrono::high_resolution_clock::now();
@@ -586,15 +533,16 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
 
         wi::backlog::post("Scene loaded successfully\n");
 
-        // DEBUG: Dump weather entities, their children (sun/moon lights), and all directional lights
+        // DEBUG: Dump weather entities, their children (sun/moon lights), and all directional
+        // lights
         {
             sprintf_s(buffer, "[Sky DEBUG] Weather count: %zu\n", scene.weathers.GetCount());
             wi::backlog::post(buffer);
             for (size_t i = 0; i < scene.weathers.GetCount(); ++i) {
                 wi::ecs::Entity weatherEntity = scene.weathers.GetEntity(i);
                 wi::scene::NameComponent *weatherName = scene.names.GetComponent(weatherEntity);
-                sprintf_s(buffer, "[Sky DEBUG] Weather[%zu] entity=%u name='%s'\n",
-                          i, (unsigned)weatherEntity,
+                sprintf_s(buffer, "[Sky DEBUG] Weather[%zu] entity=%u name='%s'\n", i,
+                          (unsigned)weatherEntity,
                           weatherName ? weatherName->name.c_str() : "<unnamed>");
                 wi::backlog::post(buffer);
 
@@ -607,12 +555,18 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
                     wi::ecs::Entity child = children[c];
                     wi::scene::NameComponent *childName = scene.names.GetComponent(child);
                     wi::scene::LightComponent *childLight = scene.lights.GetComponent(child);
-                    sprintf_s(buffer, "[Sky DEBUG]   Child[%zu] entity=%u name='%s' hasLight=%s type=%s intensity=%.2f\n",
-                              c, (unsigned)child,
-                              childName ? childName->name.c_str() : "<unnamed>",
+                    sprintf_s(buffer,
+                              "[Sky DEBUG]   Child[%zu] entity=%u name='%s' hasLight=%s type=%s "
+                              "intensity=%.2f\n",
+                              c, (unsigned)child, childName ? childName->name.c_str() : "<unnamed>",
                               childLight ? "YES" : "no",
-                              childLight ? (childLight->type == wi::scene::LightComponent::DIRECTIONAL ? "DIRECTIONAL" :
-                                           childLight->type == wi::scene::LightComponent::POINT ? "POINT" : "SPOT") : "n/a",
+                              childLight
+                                  ? (childLight->type == wi::scene::LightComponent::DIRECTIONAL
+                                         ? "DIRECTIONAL"
+                                     : childLight->type == wi::scene::LightComponent::POINT
+                                         ? "POINT"
+                                         : "SPOT")
+                                  : "n/a",
                               childLight ? childLight->intensity : 0.0f);
                     wi::backlog::post(buffer);
                 }
@@ -629,14 +583,16 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
                     wi::scene::NameComponent *lightName = scene.names.GetComponent(lightEntity);
                     wi::scene::HierarchyComponent *hier = scene.hierarchy.GetComponent(lightEntity);
                     wi::ecs::Entity parentEntity = hier ? hier->parentID : wi::ecs::INVALID_ENTITY;
-                    wi::scene::NameComponent *parentName = parentEntity != wi::ecs::INVALID_ENTITY ?
-                        scene.names.GetComponent(parentEntity) : nullptr;
-                    sprintf_s(buffer, "[Sky DEBUG] DirectionalLight[%zu] entity=%u name='%s' intensity=%.2f color=(%.2f,%.2f,%.2f) parent=%u parentName='%s'\n",
+                    wi::scene::NameComponent *parentName =
+                        parentEntity != wi::ecs::INVALID_ENTITY
+                            ? scene.names.GetComponent(parentEntity)
+                            : nullptr;
+                    sprintf_s(buffer,
+                              "[Sky DEBUG] DirectionalLight[%zu] entity=%u name='%s' "
+                              "intensity=%.2f color=(%.2f,%.2f,%.2f) parent=%u parentName='%s'\n",
                               dirCount, (unsigned)lightEntity,
-                              lightName ? lightName->name.c_str() : "<unnamed>",
-                              light.intensity,
-                              light.color.x, light.color.y, light.color.z,
-                              (unsigned)parentEntity,
+                              lightName ? lightName->name.c_str() : "<unnamed>", light.intensity,
+                              light.color.x, light.color.y, light.color.z, (unsigned)parentEntity,
                               parentName ? parentName->name.c_str() : "<unnamed>");
                     wi::backlog::post(buffer);
                     dirCount++;
@@ -696,16 +652,20 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
 
         // DEBUG: Check what the weather system resolved after first Update
         {
-            sprintf_s(buffer, "[Sky DEBUG] After Update(0): weather.most_important_light_index=%u moon_light_index=%u\n",
+            sprintf_s(buffer,
+                      "[Sky DEBUG] After Update(0): weather.most_important_light_index=%u "
+                      "moon_light_index=%u\n",
                       scene.weather.most_important_light_index, scene.weather.moon_light_index);
             wi::backlog::post(buffer);
             sprintf_s(buffer, "[Sky DEBUG] sunColor=(%.3f,%.3f,%.3f) sunDir=(%.3f,%.3f,%.3f)\n",
                       scene.weather.sunColor.x, scene.weather.sunColor.y, scene.weather.sunColor.z,
-                      scene.weather.sunDirection.x, scene.weather.sunDirection.y, scene.weather.sunDirection.z);
+                      scene.weather.sunDirection.x, scene.weather.sunDirection.y,
+                      scene.weather.sunDirection.z);
             wi::backlog::post(buffer);
             sprintf_s(buffer, "[Sky DEBUG] moonColor=(%.3f,%.3f,%.3f) moonDir=(%.3f,%.3f,%.3f)\n",
-                      scene.weather.moonColor.x, scene.weather.moonColor.y, scene.weather.moonColor.z,
-                      scene.weather.moonDirection.x, scene.weather.moonDirection.y, scene.weather.moonDirection.z);
+                      scene.weather.moonColor.x, scene.weather.moonColor.y,
+                      scene.weather.moonColor.z, scene.weather.moonDirection.x,
+                      scene.weather.moonDirection.y, scene.weather.moonDirection.z);
             wi::backlog::post(buffer);
         }
 
@@ -725,7 +685,19 @@ void GameStartup::LoadGameScene(wi::scene::Scene &scene) {
         // Enable physics simulation for character collision with ground
         wi::physics::SetSimulationEnabled(true);
 
+        // Initialize Merlin Lua subsystem (before creating characters)
+        std::string exePath = wi::helper::GetExecutablePath();
+        std::string exeDir = wi::helper::GetDirectoryFromPath(exePath);
+        std::string merlin_path = exeDir + "Merlin";
+        merlinLua.Initialize(merlin_path);
+
+        // Spawn player character from metadata
         SpawnCharactersFromMetadata(scene);
+
+        // Create Merlin NPCs after player character is created
+        if (merlinLua.IsInitialized() && playerCharacter != wi::ecs::INVALID_ENTITY) {
+            merlinLua.CreateNpcs();
+        }
 
         if (!npcEntities.empty()) {
             LoadNPCScripts();

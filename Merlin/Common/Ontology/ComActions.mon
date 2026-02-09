@@ -1,0 +1,51 @@
+
+# NOTE: Words in parenthesis -- such as (traits) and (emo) -- are used for GROUPING only: they don't define a sub-category.
+
+relation
+
+    behaviour /noun
+
+        # By convention, actions are ALL CAPS, and always written in the singular
+        #
+        # /noun = defines 'action' as a noun
+        # For all subsequent definitions:
+        # * Assume that they are actions: //action
+        # * Assume that their subject field is is always a human: //sub human
+        # * Assume that their target field is exclusive: //tar @excl
+        action /noun //action //sub human //tar @excl
+
+            READ            /read   /motor eyes
+            PERCEIVE_ATTR   /obs    /motor eyes
+
+            ASK             /listen /motor mouth /uninterruptable /sub @msgAuthor /tar @qs @excl @S /aux @msgAudience
+            TELL            /listen /motor mouth /uninterruptable /sub @msgAuthor /tar @msg @excl @S /aux @msgAudience
+
+            WRITE_DOC       /obs /motor eyes hands /aux @msg @excl
+            STACK_TAKE      /obs /motor hands
+            STACK_PUT       /obs /motor hands
+            MAKE_DONE_STACK /obs /motor eyes
+
+            # Might seem strange that turn-to doesn't use the legs motor, but it's just because
+            # we don't want walking actions to compete with turning actions.  So instead we use the mind motor.
+            TURN_TO         /obs /motor mind
+
+            WALK_TO         /obs /motor legs
+            HALT            /obs /motor legs
+
+            STAB            /obs /motor hands
+            OFFER           /obs /motor hands
+            TAKE            /obs /motor hands
+            PUT             /obs /motor hands
+            WEAR            /obs /motor hands
+
+            HAVE_SEX_WITH   /obs /motor eyes hands legs /sub human /tar human
+            GIVE_BIRTH      /obs /motor eyes hands legs /sub human
+            DIE             /obs /motor eyes hands legs /sub human
+
+            # Meta-entity actions are imperceptible
+            MAKE_CONV_META_ENT      /motor mind /sub human
+            DESTROY_CONV_META_ENT   /motor mind /sub human
+
+            # These are a bit hacky
+            ACQUIRE                 /motor mind
+            SPAWN                   /motor mind

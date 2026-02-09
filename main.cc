@@ -519,8 +519,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
     application.ActivatePath(&noesisRenderPath);
 
-    // Set master scene and load game scene
-    noesisRenderPath.gameStartup.LoadGameScene(scene);
+    // Set master scene (game scene will be loaded when Play Game is pressed)
     wi::Project::ptr()->master_scene = &scene;
 
     // Apply graphics settings from project's grym_project.ini [graphics] section

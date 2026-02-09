@@ -30,6 +30,8 @@ set(SOURCE_FILES
         PhotoMode.cc
         GameStartup.h
         GameStartup.cc
+        MerlinLua.h
+        MerlinLua.cc
 )
 
 # Resource files
@@ -43,6 +45,13 @@ set(GRYM_ENGINE_DIR "${GRYM_ROOT_DIR}/Engine")
 set(GRYM_BUILD_DIR_RELEASE "${GRYM_ROOT_DIR}/cmake-build-release-visual-studio/Engine" CACHE PATH "Path to GrymEngine Release build directory")
 set(GRYM_BUILD_DIR_DEBUG "${GRYM_ROOT_DIR}/cmake-build-debug-visual-studio/Engine" CACHE PATH "Path to GrymEngine Debug build directory")
 set(GRYM_SHADERS_DIR "${GRYM_ROOT_DIR}/cmake-build-release-visual-studio/Editor/shaders" CACHE PATH "Path to pre-compiled shaders")
+
+# Set LuaJIT and Merlin paths
+set(LUAJIT_ROOT "E:/Repos/luajit/src" CACHE PATH "Path to LuaJIT source/build")
+set(MERLIN_ROOT "E:/Repos/Merlin" CACHE PATH "Path to Merlin repository root")
+set(MERLIN_SOURCE_DIR "${MERLIN_ROOT}/Src/Lib")
+set(MERLIN_BUILD_DIR_RELEASE "${MERLIN_ROOT}/cmake-build-release-visual-studio" CACHE PATH "Path to Merlin Release build output")
+set(MERLIN_BUILD_DIR_DEBUG "${MERLIN_ROOT}/cmake-build-win-debug" CACHE PATH "Path to Merlin Debug build output")
 
 # Set NoesisGUI paths
 set(NOESISGUI_ROOT_DIR "E:/3rdparty/NoesisGUI-NativeSDK-win-3.2.10-Indie" CACHE PATH "Path to NoesisGUI root directory")
@@ -80,11 +89,11 @@ set_target_properties(Jolt PROPERTIES
         IMPORTED_LOCATION "${GRYM_BUILD_DIR_RELEASE}/Jolt.lib"
 )
 
-add_library(LUA STATIC IMPORTED)
-set_target_properties(LUA PROPERTIES
-        IMPORTED_LOCATION_RELEASE "${GRYM_BUILD_DIR_RELEASE}/LUA/LUA.lib"
-        IMPORTED_LOCATION_DEBUG "${GRYM_BUILD_DIR_DEBUG}/LUA/LUA.lib"
-        IMPORTED_LOCATION "${GRYM_BUILD_DIR_RELEASE}/LUA/LUA.lib"
+# LuaJIT for Merlin integration
+add_library(LuaJIT STATIC IMPORTED)
+set_target_properties(LuaJIT PROPERTIES
+        IMPORTED_LOCATION "${LUAJIT_ROOT}/lua51.lib"
+        INTERFACE_INCLUDE_DIRECTORIES "${LUAJIT_ROOT}"
 )
 
 add_library(Utility STATIC IMPORTED)
@@ -101,7 +110,15 @@ set_target_properties(GrymEngine PROPERTIES
         IMPORTED_LOCATION_RELEASE "${GRYM_BUILD_DIR_RELEASE}/GrymEngine_Windows.lib"
         IMPORTED_LOCATION_DEBUG "${GRYM_BUILD_DIR_DEBUG}/GrymEngine_Windows.lib"
         IMPORTED_LOCATION "${GRYM_BUILD_DIR_RELEASE}/GrymEngine_Windows.lib"  # Default to Release
-        INTERFACE_LINK_LIBRARIES "Jolt;LUA;Utility"
+        INTERFACE_LINK_LIBRARIES "Jolt;Utility"
+)
+
+# Create imported target for Merlin (source browsing + debugging)
+# Merlin is loaded at runtime via LuaJIT FFI, not linked directly,
+# but we import it so the IDE can browse its source under External Libraries.
+add_library(MerlinLib INTERFACE IMPORTED)
+set_target_properties(MerlinLib PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${MERLIN_SOURCE_DIR}"
 )
 
 # Create imported target for NoesisGUI
@@ -135,8 +152,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PUBLIC
         GrymEngine
         Jolt
-        LUA
         Utility
+        LuaJIT
+        MerlinLib
         NoesisGUI
         d3d12.lib
         dxgi.lib
@@ -205,6 +223,41 @@ message(STATUS "NoesisGUI include: ${NOESISGUI_INCLUDE_DIR}")
 message(STATUS "NoesisGUI library: ${NOESISGUI_LIB_DIR}/Noesis.lib")
 message(STATUS "NoesisGUI DLL: ${NOESISGUI_BIN_DIR}/Noesis.dll")
 
+# Create custom command for copying Merlin DLL that depends on the DLL files
+# This ensures the copy runs whenever the DLL changes, even without rebuilding the project
+set(MERLIN_DLL_DEBUG_PATH "${MERLIN_BUILD_DIR_DEBUG}/Src/Lib/Merlin.dll")
+set(MERLIN_DLL_RELEASE_PATH "${MERLIN_BUILD_DIR_RELEASE}/Src/Lib/Merlin.dll")
+
+# Build list of DLL dependencies (only include files that exist)
+set(MERLIN_DLL_DEPENDENCIES ${CMAKE_CURRENT_SOURCE_DIR}/CopyMerlinDll.cmake)
+if(EXISTS "${MERLIN_DLL_DEBUG_PATH}")
+    list(APPEND MERLIN_DLL_DEPENDENCIES "${MERLIN_DLL_DEBUG_PATH}")
+endif()
+if(EXISTS "${MERLIN_DLL_RELEASE_PATH}")
+    list(APPEND MERLIN_DLL_DEPENDENCIES "${MERLIN_DLL_RELEASE_PATH}")
+endif()
+
+# Create a custom target that depends on the DLL files
+# This target will be "built" (i.e., its command will run) whenever the DLLs change
+# ALL ensures it's included in the default build, so it runs every time
+add_custom_target(CopyMerlinDllTarget ALL
+        DEPENDS ${MERLIN_DLL_DEPENDENCIES}
+)
+
+# Add commands to the custom target that copy the DLL and Merlin folder
+# The DLL copy uses copy_if_different, so it only copies if the DLL has actually changed
+# The Merlin folder is copied every time (regardless of changes)
+add_custom_command(
+        TARGET CopyMerlinDllTarget POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DDEBUG_DIR="${MERLIN_BUILD_DIR_DEBUG}/Src/Lib" -DRELEASE_DIR="${MERLIN_BUILD_DIR_RELEASE}/Src/Lib" -DOUTPUT_DIR="$<TARGET_FILE_DIR:${PROJECT_NAME}>" -DCONFIG=$<CONFIG> -P ${CMAKE_CURRENT_SOURCE_DIR}/CopyMerlinDll.cmake
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Merlin "$<TARGET_FILE_DIR:${PROJECT_NAME}>/Merlin"
+        COMMENT "Copying Merlin.dll and Merlin folder"
+)
+
+# Make the executable depend on the CopyMerlinDllTarget
+# This ensures the DLL is copied before the executable is built/run
+add_dependencies(${PROJECT_NAME} CopyMerlinDllTarget)
+
 # Copy required files
 add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
@@ -215,6 +268,8 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${GRYM_SHADERS_DIR} ${CMAKE_CURRENT_BINARY_DIR}/shaders
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Logo.png ${CMAKE_CURRENT_BINARY_DIR}/Logo.png
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/MainMenu.png ${CMAKE_CURRENT_BINARY_DIR}/GUI/MainMenu.png
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LUAJIT_ROOT}/lua51.dll ${CMAKE_CURRENT_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Lua/jit ${CMAKE_CURRENT_BINARY_DIR}/lua/jit
         COMMENT "Copying required runtime files to build directory"
 )
 

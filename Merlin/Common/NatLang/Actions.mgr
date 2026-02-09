@@ -1,0 +1,26 @@
+
+:SPECIAL_ACTION
+"offers $obj_np(NP) to $rec_np(NP)"                 /pres OFFER $obj_np(NP) $rec_np(NP)     .
+"offered $obj_np(NP) to $rec_np(NP)"                /past OFFER $obj_np(NP) $rec_np(NP)     .
+"takes $obj_np(NP) with $gripper_np(NP)"            /pres TAKE $obj_np(NP) $gripper_np(NP)  .
+"took $obj_np(NP) with $gripper_np(NP)"             /past TAKE $obj_np(NP) $obj_np(NP)      .
+"puts $obj_np(NP) on their $bodypart_np(NP)"        /pres WEAR $obj_np(NP) $bodypart_np(NP) .
+"put $obj_np(NP) on their $bodypart_np(NP)"         /pres WEAR $obj_np(NP) $bodypart_np(NP) .
+
+
+:TRANS_ACTION
+"walks to"                          /pres WALK_TO               .
+"walked to"                         /past WALK_TO               .
+"has sex with"                      /pres HAVE_SEX_WITH         .
+"had sex with"                      /past HAVE_SEX_WITH         .
+"makes conversation with"           /pres MAKE_CONV_META_ENT    .
+"made conversation with"            /past MAKE_CONV_META_ENT    .
+"acquires"                          /pres ACQUIRE               .
+"acquired"                          /past ACQUIRE               .
+
+
+:INTRANS_ACTION
+"gives birth"                       /pres GIVE_BIRTH            .
+"gave birth"                        /past GIVE_BIRTH            .
+"dies"                              /pres DIE                   .
+"died"                              /past DIE                   .

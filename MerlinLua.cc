@@ -1,0 +1,209 @@
+#include "MerlinLua.h"
+
+#include "GrymEngine.h"
+
+#include <lua.hpp>
+#include <filesystem>
+
+// Pure C print function - no C++ objects on the stack
+static int merlin_lua_print(lua_State* L) {
+    char buf[2048];
+    int pos = 0;
+    int n = lua_gettop(L);
+    for (int i = 1; i <= n; i++) {
+        if (i > 1 && pos < 2046) buf[pos++] = '\t';
+        const char* s = lua_tostring(L, i);
+        if (s) {
+            while (*s && pos < 2046) buf[pos++] = *s++;
+        }
+    }
+    if (pos < 2047) buf[pos++] = '\n';
+    buf[pos] = '\0';
+    wi::backlog::post(buf);
+    return 0;
+}
+
+bool MerlinLua::Initialize(const std::string& merlin_path) {
+    if (L != nullptr) {
+        wi::backlog::post("MerlinLua already initialized\n");
+        return false;
+    }
+
+    // Create new Lua state with all standard libraries
+    L = luaL_newstate();
+    if (!L) {
+        wi::backlog::post("ERROR: Failed to create Lua state for Merlin\n");
+        return false;
+    }
+    
+    luaL_openlibs(L);
+    
+    // Redirect Lua print() to wi::backlog::post() using a pure C function
+    lua_pushcfunction(L, merlin_lua_print);
+    lua_setglobal(L, "print");
+    
+    // Get the current executable directory for cwd (where Merlin.dll lives)
+    std::string exe_path = wi::helper::GetExecutablePath();
+    std::string exe_dir = wi::helper::GetDirectoryFromPath(exe_path);
+    
+    // Set global 'cwd' to exe directory so mx.lua can find Merlin.dll
+    lua_pushstring(L, exe_dir.c_str());
+    lua_setglobal(L, "cwd");
+    
+    // Set global 'merlin_path' so Lua scripts can find Merlin data tree
+    lua_pushstring(L, merlin_path.c_str());
+    lua_setglobal(L, "merlin_path");
+    
+    // Adjust package.path to include Merlin scripts and Lua directory
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "path");
+    std::string current_path = lua_tostring(L, -1);
+    lua_pop(L, 1);
+    
+    // Add Merlin/Game/Scripts/?.lua and Lua/?.lua to package.path
+    std::string new_path = current_path + 
+        ";" + merlin_path + "/Game/Scripts/?.lua" +
+        ";" + exe_dir + "/Lua/?.lua";
+    
+    lua_pushstring(L, new_path.c_str());
+    lua_setfield(L, -2, "path");
+    lua_pop(L, 1); // pop package table
+    
+    // Load and run main.lua which sets up the Merlin environment
+    std::string main_lua_path = merlin_path + "/Game/Scripts/main.lua";
+    
+    if (luaL_dofile(L, main_lua_path.c_str()) != LUA_OK) {
+        const char* error_msg = lua_tostring(L, -1);
+        char buffer[512];
+        sprintf_s(buffer, "ERROR: Failed to load Merlin main.lua: %s\n", error_msg ? error_msg : "unknown error");
+        wi::backlog::post(buffer);
+        
+        // Try to get stack trace
+        lua_getglobal(L, "debug");
+        if (lua_istable(L, -1)) {
+            lua_getfield(L, -1, "traceback");
+            if (lua_isfunction(L, -1)) {
+                lua_pushvalue(L, -3);
+                lua_call(L, 1, 1);
+                const char* traceback = lua_tostring(L, -1);
+                sprintf_s(buffer, "Stack trace:\n%s\n", traceback ? traceback : "<no traceback>");
+                wi::backlog::post(buffer);
+                lua_pop(L, 1);
+            }
+            lua_pop(L, 1);
+        }
+        lua_pop(L, 1);
+        
+        lua_pop(L, 1);
+        lua_close(L);
+        L = nullptr;
+        return false;
+    }
+    
+    // Call merlinInit() to start the simulation
+    lua_getglobal(L, "merlinInit");
+    if (!lua_isfunction(L, -1)) {
+        char buffer[512];
+        int type = lua_type(L, -1);
+        sprintf_s(buffer, "ERROR: merlinInit is not a function (type=%s)\n", lua_typename(L, type));
+        wi::backlog::post(buffer);
+        lua_pop(L, 1);
+        lua_close(L);
+        L = nullptr;
+        return false;
+    }
+    
+    // Disable JIT compilation (Merlin FFI callbacks re-enter Lua, which can cause issues with JIT)
+    luaL_dostring(L, "jit.off()");
+    
+    // Call merlinInit()
+    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+        const char* error_msg = lua_tostring(L, -1);
+        char buffer[512];
+        sprintf_s(buffer, "ERROR: merlinInit() failed: %s\n", error_msg ? error_msg : "unknown error");
+        wi::backlog::post(buffer);
+        lua_pop(L, 1);
+        lua_close(L);
+        L = nullptr;
+        return false;
+    }
+    
+    return true;
+}
+
+void MerlinLua::CreateNpcs() {
+    if (!L) {
+        wi::backlog::post("ERROR: Cannot create NPCs - Merlin Lua not initialized\n");
+        return;
+    }
+    
+    // Call merlinCreateNpcs() to create the 4 root NPCs
+    lua_getglobal(L, "merlinCreateNpcs");
+    if (!lua_isfunction(L, -1)) {
+        char buffer[512];
+        int type = lua_type(L, -1);
+        sprintf_s(buffer, "ERROR: merlinCreateNpcs is not a function (type=%s)\n", lua_typename(L, type));
+        wi::backlog::post(buffer);
+        lua_pop(L, 1);
+        return;
+    }
+    
+    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+        const char* error_msg = lua_tostring(L, -1);
+        char buffer[512];
+        sprintf_s(buffer, "ERROR: merlinCreateNpcs() failed: %s\n", error_msg ? error_msg : "unknown error");
+        wi::backlog::post(buffer);
+        lua_pop(L, 1);
+    } else {
+        wi::backlog::post("Merlin NPCs created successfully\n");
+    }
+}
+
+void MerlinLua::Update(float dt) {
+    if (!L) {
+        return;
+    }
+    
+    // Call merlinUpdate(dt) each frame
+    lua_getglobal(L, "merlinUpdate");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 1);
+        return;
+    }
+    
+    lua_pushnumber(L, dt);
+    
+    if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
+        const char* error_msg = lua_tostring(L, -1);
+        char buffer[512];
+        sprintf_s(buffer, "ERROR: merlinUpdate() failed: %s\n", error_msg ? error_msg : "unknown error");
+        wi::backlog::post(buffer);
+        lua_pop(L, 1);
+    }
+}
+
+void MerlinLua::Shutdown() {
+    if (!L) {
+        return;
+    }
+    
+    // Call merlinShutdown() to cleanly stop the simulation
+    lua_getglobal(L, "merlinShutdown");
+    if (lua_isfunction(L, -1)) {
+        if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+            const char* error_msg = lua_tostring(L, -1);
+            char buffer[512];
+            sprintf_s(buffer, "WARNING: merlinShutdown() failed: %s\n", error_msg ? error_msg : "unknown error");
+            wi::backlog::post(buffer);
+            lua_pop(L, 1);
+        }
+    } else {
+        lua_pop(L, 1);
+    }
+    
+    // Close Lua state
+    lua_close(L);
+    L = nullptr;
+    
+    wi::backlog::post("Merlin Lua subsystem shut down\n");
+}

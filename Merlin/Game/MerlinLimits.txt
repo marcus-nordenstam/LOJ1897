@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------------------------------
+# Merlin limits
+# ---------------------------------------------------------------------------------------
+
+# The max number of milliseconds each cycle is allowed
+cycleBudgetMs = 10000
+
+# Maximum limit on the number of minds/NPCs allowed at any given time.
+npcCapacity = 128
+
+# Maximum limit on the number of players allowed at any given time.
+playerCapacity = 4
+
+# Cannot exceed 65k
+tokenCapacityPerNpcMind = 4096
+
+# Cannot exceed 65k
+EPSWmeCapacityPerNpcMind = 4096
+
+# ---------------------------------------------------------------------------------------
+# Memory pool limits
+#
+# Pool limits are given as three numbers:
+#                                       max     init-    growth-
+#                                       items  reserved  stride
+# ---------------------------------------------------------------------------------------
+
+# Environment pools
+env.occupantsTable.pool             =   200     100     10
+env.entityIds32.pool                =   250     100     10
+env.entityIds64.pool                =   250     100     10
+env.entityIds128.pool               =   250     100     10
+env.sounds.pool                     =   1000    200     20
+
+# Rule pools
+abs.rules.pool                      =   1000    256     64
+npc.rules.pool                      =   256     128     16
+
+# General data pools
+npc.uint16s8.pool                   =   10000   5000    100
+npc.uint32s8.pool                   =   512     256     64
+npc.structIds4.pool                 =   64      16      8
+npc.structIds16.pool                =   1024    512     64
+npc.structIds128.pool               =   16      8       8
+abs.listSymbols.pool                =   4000    2000    10
+npc.listSymbols.pool                =   1000    200     10
+npc.utilSource.pool                 =   100     40      10
+
+# Object-related pools
+npc.objects.pool                    =   1000    128     64
+npc.objectRuleRefs.pool             =   1000    512     64
+abs.objectRuleRefs.pool             =   128     64      8
+npc.namedObjectsTable.pool          =   16      8       8
+npc.catObjectsTable.pool            =   16      8       8
+npc.causedObjectsTable.pool         =   16      8       8
+npc.beliefRolesTable.pool           =   512     128     16
+npc.beliefRoles.pool                =   4096    512     64
+
+# Pattern-related pools
+npc.events.pool                     =   10000   512     128
+npc.funcs.pool                      =   2000    512     128
+npc.lists.pool                      =   2000    512     128
+npc.beliefIdsByLabel.pool           =   4       4       8
+
+# Float-data bounds
+npc.spatialBounds.pool              =   1000    128     32
+npc.float4.pool                     =   1000    64      16
+
+# EPS pools
+npc.wm.pool                         =   4096    256     128
+npc.wmeArray.pool                   =   1024    256     128
+npc.tokenArray.pool                 =   8000    1000    128
+npc.token.pool                      =   10000   2000    100
+npc.node.pool                       =   1000    250     25
+npc.alphaMemory.pool                =   512     256     64
+npc.gammaMemory.pool                =   128     32      8
+
+

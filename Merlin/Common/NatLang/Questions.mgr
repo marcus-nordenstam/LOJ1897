@@ -1,0 +1,33 @@
+
+:QS
+
+"'(' $qs_phrase(QSP) ++? ')'"
+( qs $qs_phrase(QSP) )
+.
+
+:QSP
+
+"what is $person(NP) ++'s name"
+( any { $person(NP) /pres name } ).target
+.
+"what was $person(NP) ++'s name"
+( any { $person(NP) /past name } ).target
+.
+
+"who is $person(NP) ++'s $rel(REL)"
+( any { $person(NP) /pres $rel(REL) } ).target
+.
+"who was $person(NP) ++'s $rel(REL)"
+( any { $person(NP) /past $rel(REL) } ).target
+.
+
+"where does $person(NP) live"
+( any { $person(NP) /pres home } ).target
+.
+"where did $person(NP) live"
+( any { $person(NP) /past home } ).target
+.
+
+"does $sub_np(NP) want $goal(NP)"
+( prob { $sub_np(NP) /pres goal $goal(NP) } )
+.

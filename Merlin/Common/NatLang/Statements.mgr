@@ -1,0 +1,175 @@
+
+:ST
+
+"I don't know"
+@unknown
+.
+
+"I'm not sure"
+@unknown%
+.
+
+"Yes"
+@true
+.
+
+"No"
+@false
+.
+
+# Formulaic phrases
+"$form(FORM)"
+$form(FORM)
+.
+
+# There is a...
+"There is a $np(NP)"
+( o $np(NP) )
+.
+
+# Command-statements
+
+"tell me about $obj(NP)"
+{ ?_I /pres goal { ?_you /pres tell_about $obj(NP) ?_I } }
+.
+
+"I want you to tell me about $obj(NP)"
+{ ?_I /pres goal { ?_you /pres tell_about $obj(NP) ?_I } }
+.
+
+
+# POSSESSIVE RELATIONS EXPRESSED IN THE PASSIVE FORM
+# e.g. john's mother is/was...
+
+# First-person possessive with any attribute (my X is Y)
+# e.g. my game-role is npc, my mother is $mother
+" $my(PRONOUN) $rel(REL) is $value(NP) "
+{ $my(PRONOUN) /pres $rel(REL) $value(NP) }
+.
+
+" $my(PRONOUN) $rel(REL) was $value(NP) "
+{ $my(PRONOUN) /past $rel(REL) $value(NP) }
+.
+
+# any possessive relation that is a proper name, e.g. john's name is ...
+# Uses PNAME for the value so proper names get [n ...] wrapper
+" $sub_np(NP) ++'s $pname_rel(PASSIVE_PNAME_REL) $pname(PNAME)"
+{ $sub_np(NP)      $pname_rel(PASSIVE_PNAME_REL) $pname(PNAME) } .
+
+# any possessive relation that is a number, e.g. john's age is 20
+" $sub_np(NP) ++'s $num_rel(PASSIVE_NUM_REL) $num(NUM)"
+{ $sub_np(NP)      $num_rel(PASSIVE_NUM_REL) $num(NUM) } .
+
+# any possessive PLURAL relation that is a noun-phrase, e.g. john's friends are sam and mary
+" $sub_np(NP) ++'s $passive_rel(PASSIVE_REL_PLUR) $conj(CONJ) "
+{ $sub_np(NP)      $passive_rel(PASSIVE_REL_PLUR) $conj(CONJ) }
+.
+
+# any possessive relation that is a noun-phrase, e.g. john's friend is a big red pig
+" $sub_np(NP) ++'s $passive_rel(PASSIVE_REL) $np(NP) "
+{ $sub_np(NP)      $passive_rel(PASSIVE_REL) $np(NP) }
+.
+
+# any possessive relation involving 'this', e.g. this is/was john's friend
+"this is $sub_np(NP) ++'s $rel(REL)"
+{ $sub_np(NP) /pres $rel(REL) ( this ) }
+.
+"this was $sub_np(NP) ++'s $rel(REL)"
+{ $sub_np(NP) /past $rel(REL) ( this ) }
+.
+
+# extended to include the name, e.g. this is john's friend sam
+"this is $sub_np(NP) ++'s $rel(REL) $pname(PNAME)"
+{ $sub_np(NP) /pres $rel(REL) ( this $pname(PNAME) ) }
+.
+"this was $sub_np(NP) ++'s $rel(REL) $pname(PNAME)"
+{ $sub_np(NP) /past $rel(REL) ( this $pname(PNAME) ) }
+.
+
+
+# POSSESSIVE RELATIONS EXPRESSED AS VERBS (ACTIVE relations)
+# e.g. john lives/lived at ... (instead of the passive john's home is/was)
+
+" $sub_np(NP)  $active_rel(ACTIVE_REL)  $obj_np(NP) "
+{ $sub_np(NP)  $active_rel(ACTIVE_REL)  $obj_np(NP) }
+.
+
+
+# SPEECH ACTIONS
+
+" $sub_np(NP) says ++:   $msg(MSG) to $obj_np(NP)"
+{ $sub_np(NP) /pres TELL $msg(MSG)    $obj_np(NP) }
+.
+" $sub_np(NP) said ++:   $msg(MSG) to $obj_np(NP)"
+{ $sub_np(NP) /past TELL $msg(MSG)    $obj_np(NP) }
+.
+
+" $sub_np(NP) says ++:   $qs(QS) to $obj_np(NP)"
+{ $sub_np(NP) /pres ASK  $qs(QS)    $obj_np(NP) }
+.
+" $sub_np(NP) said ++:   $qs(QS) to $obj_np(NP)"
+{ $sub_np(NP) /past ASK  $qs(QS)    $obj_np(NP) }
+.
+
+# SPEECH TASKS
+
+" $sub_np(NP) tells      $obj_np(NP) ++: $msg(MSG)"
+{ $sub_np(NP) /pres tell $msg(MSG)       $obj_np(NP) }
+.
+" $sub_np(NP) told       $obj_np(NP) ++: $msg(MSG)"
+{ $sub_np(NP) /past tell $msg(MSG)       $obj_np(NP) }
+.
+
+" $sub_np(NP) asks      $obj_np(NP) ++: $qs(QS)"
+{ $sub_np(NP) /pres ask $qs(QS)         $obj_np(NP) }
+.
+" $sub_np(NP) asked     $obj_np(NP) ++: $qs(QS)"
+{ $sub_np(NP) /past ask $qs(QS)         $obj_np(NP) }
+.
+
+
+#
+# Reported speech
+#
+# Reported speech is translated in a two-step process; we separately translate the message (appearing here as '_')
+# followed by translating the actual speaking event.  We do this because the speaker/recipient pronouns in the 
+# message may not match those of the speaking event.  For example, in "John said 'you are mean' to me", 'you' in the
+# message refers to 'me' in the speaking event.
+#
+#"$speaker(NP) said to $recipient(NP) ++: '_'"
+#{ $speaker(NP) UTTER _ $recipient(NP) /past }
+#.
+
+# ACTION-SENTENCES
+
+" $sub_np(NP) $action(SPECIAL_ACTION)"
+{ $sub_np(NP) $action(SPECIAL_ACTION) }
+.
+" $sub_np(NP) $action(TRANS_ACTION) $obj_np(NP)"
+{ $sub_np(NP) $action(TRANS_ACTION) $obj_np(NP) }
+.
+" $sub_np(NP) $action(INTRANS_ACTION)"
+{ $sub_np(NP) $action(INTRANS_ACTION) }
+.
+
+# TASK-SENTENCES
+
+" $sub_np(NP) $task(SPECIAL_TASK)"
+{ $sub_np(NP) $task(SPECIAL_TASK) }
+.
+" $sub_np(NP) $task(TRANS_TASK) $obj(CONJ|ST|QS|MSG|NP)"
+{ $sub_np(NP) $task(TRANS_TASK) $obj(CONJ|ST|QS|MSG|NP) }
+.
+" $sub_np(NP) $task(INTRANS_TASK)"
+{ $sub_np(NP) $task(INTRANS_TASK) }
+.
+
+# STATE-SENTENCES
+
+" $sub_np(NP) $state(SPECIAL_STATE) "
+{ $sub_np(NP) $state(SPECIAL_STATE) }
+.
+
+" $sub_np(NP) $state(STATE) $obj(ST|QS|MSG|NP) "
+{ $sub_np(NP) $state(STATE) $obj(ST|QS|MSG|NP) }
+.

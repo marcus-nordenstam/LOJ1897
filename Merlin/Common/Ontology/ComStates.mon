@@ -1,0 +1,196 @@
+
+# NOTE: Words in parenthesis -- such as (traits) and (emo) -- are used for GROUPING only: they don't define a sub-category.
+
+relation
+
+    state //state
+
+        # Sounds may hold spoken messages
+        speech                  /hear /sub sound @msg
+
+        # Physical states
+        obb                     /obs /tar @excl @spatialBounds /discardHistory
+        inStack                 /obs /tar ?
+        part                    /obs /tar object|space
+        color                   /obs /tar @excl
+        gender                  /obs /tar @excl
+        height                  /obs /tar @excl
+        girth                   /obs /tar @excl
+        condition               /obs /tar @excl
+        appearance              /obs /tar @excl
+        height                  /obs /tar @excl
+        girth                   /obs /tar @excl
+        wear                    /obs /sub being|bodyPart /tar accessory|clothing
+        control                 /obs /sub bodyPart       /tar object
+        wound                   /obs /tar
+        bloodStain              /obs /tar
+        bloodType               /obs /tar @excl
+        parentStructure         /obs /tar object @excl
+        # The hands of a creature
+        hand                    /obs
+        # The fingers on a hand
+        finger                  /obs
+
+        # Physiological states
+        alertness                                       /tar @excl  /def alert /discardHistory
+
+        # Abstract / reasoned states
+        withinReachOf           /tar object|space
+        facing                  /tar object|space
+        knowAnswer              /sub human              /tar @qs @S
+        price                   /sub ?                  /tar @excl
+        possess                 /sub human              /tar object
+        expect                  /sub human              /tar ?
+        initiator               /tar human
+
+        # Stack states
+        # The items in a collection/stack
+        item                    /obs /tar object
+        # The top item in a collection/stack
+        top                     /obs /sub stack          /tar @excl object
+        # The stack which an item was taken from.
+        # This state ends once the item is put back into some stack.
+        fromStack               /obs /sub object         /tar @excl stack
+        # This state holds for the current stack item being 'browsed'.
+        view                    /obs /sub human          /tar @excl object
+        # The label on a collection/stack
+        stackLabel              /obs /tar ? @excl
+        # Places may hold collections/stacks of items
+        stack                   /obs /sub space|structure    /tar @excl stack
+        mailStack               /obs /sub space|structure    /tar @excl stack
+        # Each stack may have a corresponding 'done stack' holding items already browsed
+        doneStack               /obs /sub stack              /tar @excl stack
+
+        # Special/hacky states:
+        # This state is used to make root NPCs found essential orgs at the start of the historical simulation.
+        mustFoundOrg            /sub human          /tar org
+
+        # Birth-date, founding-date, printing-date or creation-date in general
+        status                  /tar ? @excl
+        #address                /tar @excl          /sub space|structure
+        #canReach
+        #causeOfDeath           /tar @excl
+        # The author of a message (spoken or written)
+        #author                 /tar @excl          /sub human
+
+        # Personality traits
+        (traits)                //tar @excl      //sub human
+            charisma
+            sexualOrient
+            romanticism
+            passion
+            extroversion        /tar ?
+            intelligence        /tar ?
+            interests           /tar [?]
+
+        # Communicative states
+        (comm)                  //sub human
+            conversation        /tar conversation @excl
+
+        # Emotional states
+        (emo)                   //sub human
+            likes               /tar [?]
+            hates               /tar [?]
+
+        # Relationships with others
+        (social)                //sub human
+            family              /sub human              /tar family @excl   /def @unknown
+            parent              /tar human
+            mother              /tar human @excl
+            father              /tar human @excl
+            brother             /tar human
+            sister              /tar human
+            spouse              /tar human @excl
+            fiancee             /tar human @excl
+            pregnantWhen
+            pregnantBy          /tar human @excl
+            child               /tar human
+            friends             /tar [human]
+            acquaintances       /tar [human]
+            eligibleForMarriage
+            marriageDesirability /tar @excl
+            #loves               /tar [human]
+            #lovers              /tar [human]
+            #crushes             /tar [human]
+            #reasonForLover      /tar ?
+
+
+        # Vocational, legal, "societal" states
+        (cultural)
+            name                /tar @name
+            role                /tar role @excl
+            capacity            /tar ? @excl
+            age                 /tar @excl
+            ageGroup            /tar @excl
+            maritalState        /tar @excl              /sub human      /def @unknown
+            class               /tar ? @excl            /sub human
+            titles              /tar ?                  /sub human
+            nationality         /tar @excl              /sub human
+            trainingPos         /tar orgPos @excl       /sub human
+            diplomas            /tar [?]                /sub human
+            job                 /tar job                /sub human
+            membership                                  /sub human
+            hours               /tar ? @excl            /sub human
+            timeOfRetirement    /tar ? @excl            /sub human
+            livingArrangement   /tar ? @excl            /sub human
+            buildings           /tar [structure]        /sub property
+            lands               /tar [space]            /sub property
+            property            /sub person
+            # This is your primary residence, of which you can only have one at a time
+            home                /tar structure @excl    /sub human
+            # These are any of your residences, including your home
+            #residence           /tar structure          /sub human
+            owner               /tar human|org @excl
+
+        # States describing a document
+        (doc)
+            # Documents hold physical writings
+            writings            /tar [?] @msg @S    /obs
+
+        # States that describe a building
+        (bldg)                  //sub building
+            availability        /tar @excl
+
+        # States used to describe a job
+        (job)                   //sub job
+            # A job is 'at' an organisation
+            at                  /tar org @excl
+            # the job level or seniority
+            level               /tar @excl
+            # who holds the job
+            holder              /tar human @excl
+            # what the job pays
+            annualWage          /tar @excl
+
+        # States used to describe a profession
+        #(prof)                  //sub prof //tar @excl
+        #    minWage
+        #    maxWage
+
+        # States that describe an organisation
+        (org)                   //sub org
+            informalName        /tar ? @excl
+            founder             /tar human @excl
+            headProfName        /tar ? @excl
+            workerProfNames     /tar ? [?]
+            annualRevenue       /tar ? @excl
+            revPositionMult     /tar ? @excl
+            startTime           /tar ? @excl
+            appStack            /tar ? @excl
+            mainBuilding        /tar ? @excl
+            employees           /tar [human]
+            jobs                /tar [job]
+            headPos             /tar ? @excl
+            workerJobs          /tar [job]
+            vacantJob           /tar job
+            memberships         /tar [membership]
+            workplace           /tar space|structure @excl
+            workplaceKind       /tar ?
+            # The diploma given by an educational institution
+            diploma             /tar ? @excl
+
+        # States used to describe an activity-object
+        (activity)
+            participant         /tar human
+            todo                /tar task
+            do                  /tar task

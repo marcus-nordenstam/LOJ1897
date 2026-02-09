@@ -1,0 +1,13 @@
+
+
+# -----------
+# Conjucations
+# -----------
+
+:CONJ
+
+"$this(NON_CONJ_PH) and $that(CONJ|NON_CONJ_PH)"
+ $this(NON_CONJ_PH) and $that(CONJ|NON_CONJ_PH)
+.
+
+:NON_CONJ_PH = ST|QS|NP

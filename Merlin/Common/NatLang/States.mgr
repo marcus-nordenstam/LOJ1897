@@ -1,0 +1,24 @@
+
+# Some proposals carry an activity-object
+:SPECIAL_STATE
+"proposes that $obj(ST|QS|MSG|NP)"  /pres proposal $obj(ST|QS|MSG|NP) $activityObj(KIND)  .
+"proposed that $obj(ST|QS|MSG|NP)"  /past proposal $obj(ST|QS|MSG|NP) $activityObj(KIND)  .
+
+:STATE
+"proposes that"                     /pres proposal              .
+"proposed that"                     /past proposal              .
+"has the goal: "                    /pres goal                  .
+"had the goal: "                    /past goal                  .
+"is pregnant by"                    /pres pregnantBy            .
+"was pregnant by"                   /past pregnantBy            .
+"is"                                /pres isa                   .
+"was"                               /past isa                   .
+"does"                              /pres do                    .
+"did"                               /past do                    .
+"is near"                           /pres near                  .
+"was near"                          /past near                  .
+"knows the answer to"               /pres knowAnswer            .
+"knew the answer to"                /past knowAnswer            .
+"has a conversation with"           /pres conversation          .
+"had a conversation with"           /past conversation          .
+

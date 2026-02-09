@@ -1,0 +1,11 @@
+music	        1
+theatre	        1
+literature	    1
+riding	        1
+history	        1
+science	        1
+spiritualism	1
+religion	    1
+antiques	    1
+sports	        1
+sufferage	    1

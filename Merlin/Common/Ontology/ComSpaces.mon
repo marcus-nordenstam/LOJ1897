@@ -1,0 +1,31 @@
+# Kinds of spaces
+
+space //obs
+    gameSpace
+        spawnSpace
+    interiorSpace
+        entrance
+            mainEntrance
+        doorway
+        room
+            kitchen
+            diningRoom
+            restaurantDiningRoom
+            hallway
+            livingRoom
+            bedroom
+        stage
+        auditorium
+    exteriorSpace
+        land
+            territory
+                crownDependency
+                nation
+                    country
+            area
+                town
+                neighborhood
+            sportingGrounds
+                racingGrounds
+                cricketGrounds
+            estate

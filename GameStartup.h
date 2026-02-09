@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GrymEngine.h"
+#include "MerlinLua.h"
 
 #include <NsGui/Button.h>
 #include <NsGui/Grid.h>
@@ -78,6 +79,9 @@ class GameStartup {
 
     // Show/hide menu container
     void ShowMenu(bool visible);
+
+    // Merlin Lua subsystem
+    MerlinLua merlinLua;
 
   private:
     // UI elements

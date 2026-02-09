@@ -1,0 +1,3 @@
+dull	        1
+regular	        2
+charismatic	    1
