@@ -101,8 +101,10 @@ class PhotoMode {
                          uint32_t downsampleFactor, std::vector<uint8_t> &dstData,
                          uint32_t &outWidth, uint32_t &outHeight);
 
-    void ApplySepia(std::vector<uint8_t> &pixels, int width, int height);
+    void ApplyToning(std::vector<uint8_t> &pixels, int width, int height);
+    void ApplyDarkening(std::vector<uint8_t> &pixels, int width, int height, float factor);
     void AddFilmGrain(std::vector<uint8_t> &pixels, int width, int height);
+    float ComputeAverageBrightness(const std::vector<uint8_t> &pixels, int width, int height);
 
     bool SaveProcessedPhoto(const std::string &filename, const std::vector<uint8_t> &pixels,
                             int width, int height);
@@ -127,6 +129,9 @@ class PhotoMode {
 
     // Hidden player objects during camera mode
     std::vector<wi::ecs::Entity> hiddenPlayerObjects;
+
+    // Target average brightness for post-processed photos (0.0 = black, 1.0 = white)
+    float targetBrightness = 0.35f;
 
     // Shutter animation state
     float shutterAlpha = 0.0f;

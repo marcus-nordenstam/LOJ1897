@@ -237,8 +237,8 @@ void PhotoMode::CaptureFrameToMemory(wi::RenderPath3D *renderPath) {
     }
 
     // Step 2: Crop to center 1/3
-    uint32_t cropWidth = texDesc.width / 4;
-    uint32_t cropHeight = texDesc.height / 3;
+    uint32_t cropWidth = texDesc.width / 3;
+    uint32_t cropHeight = texDesc.height / 3 + (texDesc.height / 6);
     uint32_t cropX = texDesc.width / 3;
     uint32_t cropY = texDesc.height / 3;
 
@@ -261,7 +261,16 @@ void PhotoMode::CaptureFrameToMemory(wi::RenderPath3D *renderPath) {
     DownsampleRGBA8(rgba8Data, cropWidth, cropHeight, 4, downsampledData, finalWidth, finalHeight);
 
     // Step 5: Apply post-processing
-    ApplySepia(downsampledData, finalWidth, finalHeight);
+    // Always desaturate and apply a subtle sepia tint (color toning)
+    ApplyToning(downsampledData, finalWidth, finalHeight);
+
+    // Adaptively darken: only reduce brightness as much as needed to reach targetBrightness
+    float avgBrightness = ComputeAverageBrightness(downsampledData, finalWidth, finalHeight);
+    if (avgBrightness > targetBrightness && avgBrightness > 0.001f) {
+        float darkenFactor = targetBrightness / avgBrightness;
+        ApplyDarkening(downsampledData, finalWidth, finalHeight, darkenFactor);
+    }
+
     AddFilmGrain(downsampledData, finalWidth, finalHeight);
 
     // Step 6: Write PNG
@@ -490,7 +499,7 @@ void PhotoMode::DownsampleRGBA8(const std::vector<uint8_t> &srcData, uint32_t sr
     }
 }
 
-void PhotoMode::ApplySepia(std::vector<uint8_t> &pixels, int width, int height) {
+void PhotoMode::ApplyToning(std::vector<uint8_t> &pixels, int width, int height) {
     for (int i = 0; i < width * height; i++) {
         int idx = i * 4;
 
@@ -498,15 +507,28 @@ void PhotoMode::ApplySepia(std::vector<uint8_t> &pixels, int width, int height) 
         float g = pixels[idx + 1] / 255.0f;
         float b = pixels[idx + 2] / 255.0f;
 
-        // Sepia matrix transformation
-        float newR = r * 0.393f + g * 0.769f + b * 0.189f;
-        float newG = r * 0.349f + g * 0.686f + b * 0.168f;
-        float newB = r * 0.272f + g * 0.534f + b * 0.131f;
+        // Convert to grayscale (perceived luminance)
+        float gray = r * 0.299f + g * 0.587f + b * 0.114f;
 
-        // Clamp and convert back to bytes
+        // Apply a subtle warm sepia tint to the grayscale
+        float newR = gray * 1.05f;
+        float newG = gray * 0.95f;
+        float newB = gray * 0.82f;
+
         pixels[idx + 0] = (uint8_t)(std::min(newR, 1.0f) * 255.0f);
         pixels[idx + 1] = (uint8_t)(std::min(newG, 1.0f) * 255.0f);
         pixels[idx + 2] = (uint8_t)(std::min(newB, 1.0f) * 255.0f);
+    }
+}
+
+void PhotoMode::ApplyDarkening(std::vector<uint8_t> &pixels, int width, int height, float factor) {
+    factor = std::clamp(factor, 0.0f, 1.0f);
+
+    for (int i = 0; i < width * height; i++) {
+        int idx = i * 4;
+        pixels[idx + 0] = (uint8_t)(pixels[idx + 0] * factor);
+        pixels[idx + 1] = (uint8_t)(pixels[idx + 1] * factor);
+        pixels[idx + 2] = (uint8_t)(pixels[idx + 2] * factor);
     }
 }
 
@@ -515,8 +537,8 @@ void PhotoMode::AddFilmGrain(std::vector<uint8_t> &pixels, int width, int height
     for (int i = 0; i < width * height; i++) {
         int idx = i * 4;
 
-        // Generate noise (-16 to +16)
-        int noise = (rand() % 33) - 16;
+        // Generate noise (-11 to +11)
+        int noise = (rand() % 23) - 11;
 
         // Add noise to each channel
         int r = pixels[idx + 0] + noise;
@@ -529,6 +551,20 @@ void PhotoMode::AddFilmGrain(std::vector<uint8_t> &pixels, int width, int height
         pixels[idx + 2] = (uint8_t)std::clamp(b, 0, 255);
     }
 }
+
+float PhotoMode::ComputeAverageBrightness(const std::vector<uint8_t> &pixels, int width,
+                                          int height) {
+    uint64_t totalLuminance = 0;
+    const int pixelCount = width * height;
+    for (int i = 0; i < pixelCount; i++) {
+        int idx = i * 4;
+        // Perceived luminance: 0.299R + 0.587G + 0.114B (scaled by 1000 to stay in integers)
+        totalLuminance += 299 * pixels[idx + 0] + 587 * pixels[idx + 1] + 114 * pixels[idx + 2];
+    }
+    // Average luminance normalized to 0.0-1.0
+    return (float)(totalLuminance / (double)pixelCount / 1000.0 / 255.0);
+}
+
 
 bool PhotoMode::SaveProcessedPhoto(const std::string &filename, const std::vector<uint8_t> &pixels,
                                    int width, int height) {
