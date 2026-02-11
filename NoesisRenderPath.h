@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GrymEngine.h"
+#include "common/gui/grProfilerWindow.h"
 #include <wiAudio.h>
 #include <wiGraphicsDevice_DX12.h>
 #include <wiHelper.h>
@@ -73,6 +74,7 @@ class NoesisRenderPath : public wi::RenderPath3D {
     CaseboardMode caseboardSystem;
     PhotoMode cameraSystem;
     GameStartup gameStartup;
+    grProfilerWindow profilerWnd;
 
   private:
     Noesis::Ptr<Noesis::RenderDevice> noesisDevice;

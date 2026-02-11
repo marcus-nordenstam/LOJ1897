@@ -16,9 +16,6 @@ dofile(merlin_path .. "/Game/Scripts/doc.lua")
 dofile(merlin_path .. "/Game/Scripts/scene.lua")
 dofile(merlin_path .. "/Game/Scripts/sim.lua")
 
-require("globals")
--- NO drawing, rendering, or GUI modules loaded
-
 -- ---------------------------------------------------------------------------
 -- Shared C buffers for Merlin <-> GRYM entity sync.
 -- Layout matches EntitySyncEntry / EntitySyncBuffer in MerlinLua.h exactly.
@@ -45,9 +42,61 @@ waypointBuf          = ffi.cast("EntitySyncBuffer*", g_waypointBufferPtr)
 -- Global player entity
 playerEntity = nil
 
+
+
 function merlinInit()
-    -- Initialize Merlin but don't create NPCs yet
-    initMerlin(projectPath, commonPath)
+    -- Control the console output I want to see
+    --mx.toggleChannel("mc", "on")
+    --mx.toggleChannel("belief", "on")
+    --mx.toggleChannel("end", "on")
+    --mx.toggleChannel("eps", "on")
+    --mx.toggleChannel("delib", "on")
+    --mx.toggleChannel("rule", "on")
+    --mx.toggleChannel("rc", "on")
+    --mx.toggleChannel("action", "on")
+    --mx.toggleChannel("natLang", "on")
+    --mx.toggleChannel("boundary", "on")
+    --mx.toggleChannel("pattern", "on")
+    --mx.toggleChannel("match", "on")
+    --mx.toggleChannel("decay", "on")
+    --mx.toggleChannel("env", "on")
+    --mx.toggleChannel("percept", "on")
+    --mx.toggleChannel("parse", "on")
+    --mx.toggleChannel("nl", "on")
+    --mx.toggleChannel("wme", "on")
+
+    -- Initialize Merlin
+    mx.start(projectPath, commonPath)
+    mx.toggleChannel("info", "off")
+    mx.toggleChannel("warning", "off")
+
+    -- Callbacks
+    mxu.safeRegisterCallback("giveBirth", function(arg1, arg2, arg3, arg4) return giveBirth(arg1) end)
+    mxu.safeRegisterCallback("siblingRel", function(arg1, arg2, arg3, arg4) return siblingRel(arg1) end)
+    --mxu.safeRegisterCallback("acquireBuilding", function(arg1, arg2, arg3, arg4) return acquireBuilding(arg1) end)
+    --mxu.safeRegisterCallback("turnTo", function(arg1, arg2, arg3, arg4) return turnTo(arg1, arg2) end)
+
+    -- Sync random seed across Lua/Merlin
+    mxu.setRandomSeed(42)
+
+    -- NPC traits
+    mxu.initMerlinSymbols()
+    npcTraitTable = loadAttrTable("NpcTraitTables")
+    npcNonTraitTable = loadAttrTable("NpcNonTraitTables")
+
+    -- Start off the sim during the FIRST QUARTER of 1720 (matching NPC birth year)
+    firstSimYear = 1720
+    simYear = firstSimYear
+    simQuarter = 1
+    simHour = 6
+    simMin = 0.0
+    simSec = 0 -- only used by realtime sim
+
+    -- For realtime simulation, use traversal (not teleporting)
+    mx.setNpcLocomotionMode("traverse")
+
+    -- Load the game world
+    loadScene()
 end
 
 function merlinCreatePlayer(x, y, z)

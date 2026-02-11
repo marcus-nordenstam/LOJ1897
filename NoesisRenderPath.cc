@@ -1,6 +1,12 @@
 #pragma once
 
 #include "NoesisRenderPath.h"
+#include "common/gui/ImGui/imgui.h"
+#include "common/gui/ImGui/imgui_impl_win32.h"
+#include "wiProfiler.h"
+
+// Defined in main.cc
+void RenderImGui(wi::graphics::CommandList cmd);
 
 // ========== DIALOGUE SYSTEM FORWARDING ==========
 
@@ -227,6 +233,15 @@ bool NoesisRenderPath::TryHandleShortcut(Noesis::Key key) {
     case Noesis::Key_Tab:
         EnterCameraMode();
         return true;
+    case Noesis::Key_P:
+        if (profilerWnd.IsVisible()) {
+            profilerWnd.SetVisible(false);
+            SetThirdPersonMode(true);
+        } else {
+            SetThirdPersonMode(false);
+            profilerWnd.SetVisible(true);
+        }
+        return true;
     default:
         return false;
     }
@@ -321,6 +336,17 @@ void NoesisRenderPath::Stop() {
 }
 
 void NoesisRenderPath::Update(float dt) {
+    // Start new ImGui frame (for profiler overlay)
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    bool wasProfilerVisible = profilerWnd.IsVisible();
+    profilerWnd.Render();
+    // Detect if user closed the profiler via the X button
+    if (wasProfilerVisible && !profilerWnd.IsVisible()) {
+        SetThirdPersonMode(true);
+    }
+
     // Scene modifications (spawning/despawning) must happen BEFORE RenderPath3D::Update,
     // because Update kicks off parallel rendering jobs that read scene arrays.
     // Modifying the scene after that causes out-of-bounds access in visibility/occlusion.
@@ -343,8 +369,11 @@ void NoesisRenderPath::Update(float dt) {
         }
         
         // 3. Run Merlin simulation (with corrected positions from GRYM)
-        gameStartup.merlinLua.Update(dt);
-        
+        {
+            ScopedCPUProfiling("Merlin Simulation");
+            gameStartup.merlinLua.Update(dt);
+        }
+
         // 4. Process Merlin action commands: read filled buffers, dispatch to GRYM handlers
         //    (fillForeignActionBuffer) executes during Merlin sim, writes to buffers and reads outcomes from previous frame
         gameStartup.ProcessActionCommands(scene);
@@ -843,6 +872,9 @@ void NoesisRenderPath::Compose(wi::graphics::CommandList cmd) const {
 
         NoesisApp::D3D12Factory::EndPendingSplitBarriers(noesisDevice);
     }
+
+    // Render ImGui draw data (profiler overlay)
+    RenderImGui(cmd);
 }
 
 void NoesisRenderPath::ResizeBuffers() {

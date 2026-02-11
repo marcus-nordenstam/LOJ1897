@@ -2,6 +2,8 @@
 
 #include "NoesisRenderPath.h"
 #include "common/grProjectInit.h"
+#include "common/gui/ImGui/imgui.h"
+#include "common/gui/ImGui/imgui_impl_win32.h"
 
 #include <NsGui/InputEnums.h>
 
@@ -24,8 +26,189 @@ using namespace Gdiplus;
 wi::Application application;
 NoesisRenderPath *g_noesisRenderPath = nullptr; // Global reference for input handling
 
-// Forward declaration
+// ImGui rendering resources
+static wi::graphics::Shader imguiVS;
+static wi::graphics::Shader imguiPS;
+static wi::graphics::Texture fontTexture;
+static wi::graphics::Sampler imguiSampler;
+static wi::graphics::InputLayout imguiInputLayout;
+static wi::graphics::PipelineState imguiPSO;
 
+struct ImGui_Impl_Data {};
+
+static bool ImGui_Impl_CreateDeviceObjects() {
+    ImGuiIO &io = ImGui::GetIO();
+
+    unsigned char *pixels;
+    int width, height;
+    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+    wi::graphics::TextureDesc textureDesc;
+    textureDesc.width = width;
+    textureDesc.height = height;
+    textureDesc.mip_levels = 1;
+    textureDesc.array_size = 1;
+    textureDesc.format = wi::graphics::Format::R8G8B8A8_UNORM;
+    textureDesc.bind_flags = wi::graphics::BindFlag::SHADER_RESOURCE;
+
+    wi::graphics::SubresourceData textureData;
+    textureData.data_ptr = pixels;
+    textureData.row_pitch = width * wi::graphics::GetFormatStride(textureDesc.format);
+    textureData.slice_pitch = textureData.row_pitch * height;
+
+    bool success =
+        wi::graphics::GetDevice()->CreateTexture(&textureDesc, &textureData, &fontTexture);
+    if (!success) {
+        wi::backlog::post("Failed to create ImGui font texture!");
+        return false;
+    }
+
+    wi::graphics::SamplerDesc samplerDesc;
+    samplerDesc.address_u = wi::graphics::TextureAddressMode::WRAP;
+    samplerDesc.address_v = wi::graphics::TextureAddressMode::WRAP;
+    samplerDesc.address_w = wi::graphics::TextureAddressMode::WRAP;
+    samplerDesc.filter = wi::graphics::Filter::MIN_MAG_MIP_LINEAR;
+    wi::graphics::GetDevice()->CreateSampler(&samplerDesc, &imguiSampler);
+
+    io.Fonts->SetTexID((ImTextureID)&fontTexture);
+
+    imguiInputLayout.elements = {
+        {"POSITION", 0, wi::graphics::Format::R32G32_FLOAT, 0,
+         (uint32_t)IM_OFFSETOF(ImDrawVert, pos),
+         wi::graphics::InputClassification::PER_VERTEX_DATA},
+        {"TEXCOORD", 0, wi::graphics::Format::R32G32_FLOAT, 0,
+         (uint32_t)IM_OFFSETOF(ImDrawVert, uv),
+         wi::graphics::InputClassification::PER_VERTEX_DATA},
+        {"COLOR", 0, wi::graphics::Format::R8G8B8A8_UNORM, 0,
+         (uint32_t)IM_OFFSETOF(ImDrawVert, col),
+         wi::graphics::InputClassification::PER_VERTEX_DATA},
+    };
+
+    wi::graphics::PipelineStateDesc desc;
+    desc.vs = &imguiVS;
+    desc.ps = &imguiPS;
+    desc.il = &imguiInputLayout;
+    desc.dss = wi::renderer::GetDepthStencilState(wi::enums::DSSTYPE_DEPTHREAD);
+    desc.rs = wi::renderer::GetRasterizerState(wi::enums::RSTYPE_DOUBLESIDED);
+    desc.bs = wi::renderer::GetBlendState(wi::enums::BSTYPE_TRANSPARENT);
+    desc.pt = wi::graphics::PrimitiveTopology::TRIANGLELIST;
+    wi::graphics::GetDevice()->CreatePipelineState(&desc, &imguiPSO);
+
+    return true;
+}
+
+void RenderImGui(wi::graphics::CommandList cmd) {
+    ImGui::Render();
+    auto drawData = ImGui::GetDrawData();
+    if (!drawData || drawData->TotalVtxCount == 0)
+        return;
+
+    int fb_width = (int)(drawData->DisplaySize.x * drawData->FramebufferScale.x);
+    int fb_height = (int)(drawData->DisplaySize.y * drawData->FramebufferScale.y);
+    if (fb_width <= 0 || fb_height <= 0)
+        return;
+
+    wi::graphics::GraphicsDevice *device = wi::graphics::GetDevice();
+
+    const uint64_t vbSize = sizeof(ImDrawVert) * drawData->TotalVtxCount;
+    const uint64_t ibSize = sizeof(ImDrawIdx) * drawData->TotalIdxCount;
+    auto vertexBufferAllocation = device->AllocateGPU(vbSize, cmd);
+    auto indexBufferAllocation = device->AllocateGPU(ibSize, cmd);
+
+    ImDrawVert *vertexCPUMem = reinterpret_cast<ImDrawVert *>(vertexBufferAllocation.data);
+    ImDrawIdx *indexCPUMem = reinterpret_cast<ImDrawIdx *>(indexBufferAllocation.data);
+    for (int cmdListIdx = 0; cmdListIdx < drawData->CmdListsCount; cmdListIdx++) {
+        const ImDrawList *drawList = drawData->CmdLists[cmdListIdx];
+        memcpy(vertexCPUMem, &drawList->VtxBuffer[0],
+               drawList->VtxBuffer.Size * sizeof(ImDrawVert));
+        memcpy(indexCPUMem, &drawList->IdxBuffer[0],
+               drawList->IdxBuffer.Size * sizeof(ImDrawIdx));
+        vertexCPUMem += drawList->VtxBuffer.Size;
+        indexCPUMem += drawList->IdxBuffer.Size;
+    }
+
+    struct ImGuiConstants {
+        float mvp[4][4];
+    };
+
+    {
+        const float L = drawData->DisplayPos.x;
+        const float R = drawData->DisplayPos.x + drawData->DisplaySize.x;
+        const float T = drawData->DisplayPos.y;
+        const float B = drawData->DisplayPos.y + drawData->DisplaySize.y;
+
+        ImGuiConstants constants;
+        float mvp[4][4] = {
+            {2.0f / (R - L), 0.0f, 0.0f, 0.0f},
+            {0.0f, 2.0f / (T - B), 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.5f, 0.0f},
+            {(R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f},
+        };
+        memcpy(&constants.mvp, mvp, sizeof(mvp));
+        device->BindDynamicConstantBuffer(constants, 0, cmd);
+    }
+
+    const wi::graphics::GPUBuffer *vbs[] = {&vertexBufferAllocation.buffer};
+    const uint32_t strides[] = {sizeof(ImDrawVert)};
+    const uint64_t offsets[] = {vertexBufferAllocation.offset};
+
+    device->BindVertexBuffers(vbs, 0, 1, strides, offsets, cmd);
+    device->BindIndexBuffer(&indexBufferAllocation.buffer,
+                            wi::graphics::IndexBufferFormat::UINT16,
+                            indexBufferAllocation.offset, cmd);
+
+    wi::graphics::Viewport viewport;
+    viewport.width = (float)fb_width;
+    viewport.height = (float)fb_height;
+    device->BindViewports(1, &viewport, cmd);
+
+    device->BindPipelineState(&imguiPSO, cmd);
+    device->BindSampler(&imguiSampler, 0, cmd);
+
+    ImVec2 clip_off = drawData->DisplayPos;
+    ImVec2 clip_scale = drawData->FramebufferScale;
+
+    int32_t vertexOffset = 0;
+    uint32_t indexOffset = 0;
+    for (uint32_t cmdListIdx = 0; cmdListIdx < (uint32_t)drawData->CmdListsCount;
+         ++cmdListIdx) {
+        const ImDrawList *drawList = drawData->CmdLists[cmdListIdx];
+        for (uint32_t cmdIndex = 0; cmdIndex < (uint32_t)drawList->CmdBuffer.size();
+             ++cmdIndex) {
+            const ImDrawCmd *pcmd = &drawList->CmdBuffer[cmdIndex];
+            if (pcmd->UserCallback != NULL) {
+                pcmd->UserCallback(drawList, pcmd);
+            } else {
+                ImVec2 clip_min((pcmd->ClipRect.x - clip_off.x) * clip_scale.x,
+                                (pcmd->ClipRect.y - clip_off.y) * clip_scale.y);
+                ImVec2 clip_max((pcmd->ClipRect.z - clip_off.x) * clip_scale.x,
+                                (pcmd->ClipRect.w - clip_off.y) * clip_scale.y);
+                if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
+                    continue;
+
+                wi::graphics::Rect scissor;
+                scissor.left = (int32_t)clip_min.x;
+                scissor.top = (int32_t)clip_min.y;
+                scissor.right = (int32_t)clip_max.x;
+                scissor.bottom = (int32_t)clip_max.y;
+                device->BindScissorRects(1, &scissor, cmd);
+
+                const wi::graphics::Texture *texture =
+                    (const wi::graphics::Texture *)pcmd->GetTexID();
+                device->BindResource(texture, 0, cmd);
+
+                device->DrawIndexed(pcmd->ElemCount, indexOffset + pcmd->IdxOffset,
+                                    vertexOffset + (int32_t)pcmd->VtxOffset, cmd);
+            }
+        }
+        indexOffset += (uint32_t)drawList->IdxBuffer.Size;
+        vertexOffset += drawList->VtxBuffer.Size;
+    }
+}
+
+// Forward declarations
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg,
+                                                              WPARAM wParam, LPARAM lParam);
 Noesis::Key ConvertWin32KeyToNoesis(int vk);
 
 // Helper function to get executable directory and construct full path
@@ -254,35 +437,53 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                       _In_ LPWSTR lpCmdLine, _In_ int nCmdShow) {
     // Win32 window and message loop setup:
     static auto WndProc = [](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) -> LRESULT {
+        // Forward input to ImGui so the profiler window is interactive
+        if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+            return true;
+
+        // When the profiler window is visible, let ImGui consume mouse events
+        bool profilerWantsInput = g_noesisRenderPath &&
+                                  g_noesisRenderPath->profilerWnd.IsVisible() &&
+                                  ImGui::GetIO().WantCaptureMouse;
+
         switch (message) {
         case WM_SIZE:
         case WM_DPICHANGED:
             if (application.is_window_active)
-
                 application.SetWindow(hWnd);
             break;
         case WM_KEYDOWN:
-            // Forward KeyDown to Noesis so it can handle backspace, arrows, etc.
-            g_noesisRenderPath->GetNoesisView()->KeyDown(ConvertWin32KeyToNoesis((int)wParam));
+            if (!ImGui::GetIO().WantCaptureKeyboard) {
+                // Forward KeyDown to Noesis so it can handle backspace, arrows, etc.
+                g_noesisRenderPath->GetNoesisView()->KeyDown(
+                    ConvertWin32KeyToNoesis((int)wParam));
+            }
             break;
         case WM_KEYUP:
-            g_noesisRenderPath->GetNoesisView()->KeyUp(ConvertWin32KeyToNoesis((int)wParam));
+            if (!ImGui::GetIO().WantCaptureKeyboard) {
+                g_noesisRenderPath->GetNoesisView()->KeyUp(
+                    ConvertWin32KeyToNoesis((int)wParam));
+            }
             break;
         case WM_CHAR:
-            //  Filter out control characters except tab, newline, carriage return, and backspace
-            if (wParam >= 32 || wParam == 8 || wParam == 9 || wParam == 10 || wParam == 13) {
-                g_noesisRenderPath->GetNoesisView()->Char(wParam);
+            if (!ImGui::GetIO().WantCaptureKeyboard) {
+                // Filter out control characters except tab, newline, carriage return, backspace
+                if (wParam >= 32 || wParam == 8 || wParam == 9 || wParam == 10 ||
+                    wParam == 13) {
+                    g_noesisRenderPath->GetNoesisView()->Char(wParam);
+                }
             }
-
             break;
         case WM_LBUTTONDOWN:
+            // Skip game/Noesis mouse handling when ImGui wants the mouse (profiler)
+            if (profilerWantsInput)
+                break;
             // Forward mouse to Noesis when menu is visible, dialogue, caseboard, or camera mode
             if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() &&
                 (g_noesisRenderPath->IsMenuVisible() ||
                  g_noesisRenderPath->IsDialogueModeActive() ||
                  g_noesisRenderPath->IsCaseboardModeActive() ||
                  g_noesisRenderPath->IsCameraModeActive())) {
-
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
 
@@ -290,17 +491,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                 if (g_noesisRenderPath->IsCameraModeActive()) {
                     g_noesisRenderPath->CameraClick(x, y);
                 }
-
                 // Handle caseboard panning
                 else if (g_noesisRenderPath->IsCaseboardModeActive()) {
                     g_noesisRenderPath->CaseboardPanStart(x, y);
                 }
-                g_noesisRenderPath->GetNoesisView()->MouseButtonDown(x, y,
-                                                                     Noesis::MouseButton_Left);
+                g_noesisRenderPath->GetNoesisView()->MouseButtonDown(
+                    x, y, Noesis::MouseButton_Left);
             }
-
             break;
         case WM_LBUTTONUP:
+            if (profilerWantsInput)
+                break;
             if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() &&
                 (g_noesisRenderPath->IsMenuVisible() ||
                  g_noesisRenderPath->IsDialogueModeActive() ||
@@ -311,41 +512,45 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
                 if (g_noesisRenderPath->IsCaseboardModeActive()) {
                     g_noesisRenderPath->CaseboardPanEnd();
                 }
-                g_noesisRenderPath->GetNoesisView()->MouseButtonUp(x, y, Noesis::MouseButton_Left);
+                g_noesisRenderPath->GetNoesisView()->MouseButtonUp(
+                    x, y, Noesis::MouseButton_Left);
             }
-
             break;
         case WM_RBUTTONDOWN:
+            if (profilerWantsInput)
+                break;
             if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() &&
                 (g_noesisRenderPath->IsMenuVisible() ||
                  g_noesisRenderPath->IsDialogueModeActive() ||
                  g_noesisRenderPath->IsCaseboardModeActive())) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
-                g_noesisRenderPath->GetNoesisView()->MouseButtonDown(x, y,
-                                                                     Noesis::MouseButton_Right);
+                g_noesisRenderPath->GetNoesisView()->MouseButtonDown(
+                    x, y, Noesis::MouseButton_Right);
             }
             break;
-
         case WM_RBUTTONUP:
+            if (profilerWantsInput)
+                break;
             if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() &&
                 (g_noesisRenderPath->IsMenuVisible() ||
                  g_noesisRenderPath->IsDialogueModeActive() ||
                  g_noesisRenderPath->IsCaseboardModeActive())) {
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
-                g_noesisRenderPath->GetNoesisView()->MouseButtonUp(x, y, Noesis::MouseButton_Right);
+                g_noesisRenderPath->GetNoesisView()->MouseButtonUp(
+                    x, y, Noesis::MouseButton_Right);
             }
-
             break;
         case WM_MOUSEMOVE:
             trackMouse(hWnd);
+            if (profilerWantsInput)
+                break;
             // Forward mouse to Noesis when menu is visible, dialogue, or caseboard mode
             if (g_noesisRenderPath && g_noesisRenderPath->GetNoesisView() &&
                 (g_noesisRenderPath->IsMenuVisible() ||
                  g_noesisRenderPath->IsDialogueModeActive() ||
                  g_noesisRenderPath->IsCaseboardModeActive())) {
-
                 int x = LOWORD(lParam);
                 int y = HIWORD(lParam);
 
@@ -361,12 +566,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
                 g_noesisRenderPath->GetNoesisView()->MouseMove(x, y);
             }
-
             break;
         case WM_MOUSELEAVE:
             firstTime = true;
             break;
         case WM_MOUSEWHEEL: {
+            if (profilerWantsInput)
+                break;
             int x = LOWORD(lParam);
             int y = HIWORD(lParam);
             short delta = HIWORD(wParam);
@@ -375,7 +581,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
             if (g_noesisRenderPath) {
                 g_noesisRenderPath->MouseWheel(pt.x, pt.y, delta);
             }
-
         } break;
         case WM_KILLFOCUS:
             application.is_window_active = false;
@@ -515,6 +720,33 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     // This must be called before refresh_material_library, same as Editor
     application.Initialize();
 
+    // Initialize ImGui (for profiler overlay)
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &imguiIO = ImGui::GetIO();
+    (void)imguiIO;
+    imguiIO.Fonts->AddFontDefault();
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplWin32_Init(hWnd);
+
+    IM_ASSERT(imguiIO.BackendRendererUserData == NULL &&
+              "Already initialized a renderer backend!");
+    ImGui_Impl_Data *bd = IM_NEW(ImGui_Impl_Data)();
+    imguiIO.BackendRendererUserData = (void *)bd;
+    imguiIO.BackendRendererName = "Wicked";
+    imguiIO.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
+
+    // Load ImGui shaders
+    {
+        auto savedShaderSourcePath = wi::renderer::GetShaderSourcePath();
+        wi::renderer::SetShaderSourcePath(exeDir);
+        wi::renderer::LoadShader(wi::graphics::ShaderStage::VS, imguiVS, "ImGuiVS.cso");
+        wi::renderer::LoadShader(wi::graphics::ShaderStage::PS, imguiPS, "ImGuiPS.cso");
+        wi::renderer::SetShaderSourcePath(savedShaderSourcePath);
+        ImGui_Impl_CreateDeviceObjects();
+    }
+
     wi::Project::ptr()->LoadMaterialLibrary();
 
     application.ActivatePath(&noesisRenderPath);
@@ -639,6 +871,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     }
 
     wi::jobsystem::ShutDown(); // waits for jobs to finish before shutdown
+
+    // Shutdown ImGui
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
 
     // Destroy WickedLOJ Project at the end
 

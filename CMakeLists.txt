@@ -34,6 +34,16 @@ set(SOURCE_FILES
         MerlinLua.cc
 )
 
+# ImGui source files (from GrymEngine common/gui)
+set(IMGUI_SOURCE_FILES
+        ${GRYM_ROOT_DIR}/common/gui/ImGui/imgui.cpp
+        ${GRYM_ROOT_DIR}/common/gui/ImGui/imgui_draw.cpp
+        ${GRYM_ROOT_DIR}/common/gui/ImGui/imgui_tables.cpp
+        ${GRYM_ROOT_DIR}/common/gui/ImGui/imgui_widgets.cpp
+        ${GRYM_ROOT_DIR}/common/gui/ImGui/imgui_impl_win32.cpp
+        ${GRYM_ROOT_DIR}/common/gui/grProfilerWindow.cc
+)
+
 # Resource files
 set(RESOURCE_FILES
         app.rc
@@ -132,7 +142,7 @@ set_target_properties(NoesisGUI PROPERTIES
 
 set(LIB_DXCOMPILER "dxcompiler.dll")
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${RESOURCE_FILES} ${NOESIS_D3D12_SOURCE_FILES} ${NOESIS_PROVIDERS_SOURCE_FILES})
+add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${RESOURCE_FILES} ${NOESIS_D3D12_SOURCE_FILES} ${NOESIS_PROVIDERS_SOURCE_FILES} ${IMGUI_SOURCE_FILES})
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -140,6 +150,7 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CM
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${GRYM_ENGINE_DIR}
         ${GRYM_ROOT_DIR}
+        ${GRYM_ROOT_DIR}/common/gui
         ${NOESISGUI_INCLUDE_DIR}
         ${NOESISGUI_ROOT_DIR}/Src/Packages/Render/D3D12RenderDevice/Include
         ${NOESISGUI_ROOT_DIR}/Src/Packages/Render/D3D12RenderContext/Src
@@ -271,6 +282,8 @@ add_custom_command(
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/MainMenu.png ${CMAKE_CURRENT_BINARY_DIR}/GUI/MainMenu.png
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LUAJIT_ROOT}/lua51.dll ${CMAKE_CURRENT_BINARY_DIR}
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Lua/jit ${CMAKE_CURRENT_BINARY_DIR}/lua/jit
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GRYM_ROOT_DIR}/common/gui/ImGui/ImGuiVS.hlsl ${CMAKE_CURRENT_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GRYM_ROOT_DIR}/common/gui/ImGui/ImGuiPS.hlsl ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Copying required runtime files to build directory"
 )
 
